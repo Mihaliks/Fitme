@@ -1,12 +1,14 @@
 package com.example.fitme.data.entities
 
 import androidx.room.TypeConverter
-import java.time.LocalDateTime
+import java.time.LocalDate
 
 class Converters {
     @TypeConverter
-    fun fromLocalDateTime(date: LocalDateTime): String = date.toString()
+    fun fromLocalDate(date: LocalDate): Long =
+        date.toEpochDay()
 
     @TypeConverter
-    fun toLocalDateTime(value: String): LocalDateTime = LocalDateTime.parse(value)
+    fun toLocalDate(value: Long): LocalDate =
+        LocalDate.ofEpochDay(value)
 }

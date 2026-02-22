@@ -10,7 +10,6 @@ import androidx.room.PrimaryKey
     tableName ="exercises",
     foreignKeys = [
         ForeignKey(
-
             entity = Group::class,
             parentColumns = ["id"],
             childColumns = ["group_id"],
@@ -20,7 +19,7 @@ import androidx.room.PrimaryKey
     indices = [Index("group_id")]
     )
 data class Exercise(
-    @PrimaryKey val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int,
     @ColumnInfo(name="name") val name: String,
     @ColumnInfo(name="lastmax1") val lastmax1 : String,
     @ColumnInfo(name="lastmax2") val lastmax2 : String,
