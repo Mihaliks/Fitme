@@ -1,14 +1,12 @@
 package com.example.fitme.data.entities
 
 import androidx.room.TypeConverter
-import java.util.Date
+import java.time.LocalDateTime
 
-
-//Это специальный класс для автоконвертации форматов Date - Long
 class Converters {
     @TypeConverter
-    fun fromDate(date: Date): Long = date.time
+    fun fromLocalDateTime(date: LocalDateTime): String = date.toString()
 
     @TypeConverter
-    fun toDate(timestamp: Long): Date = Date(timestamp)
+    fun toLocalDateTime(value: String): LocalDateTime = LocalDateTime.parse(value)
 }
