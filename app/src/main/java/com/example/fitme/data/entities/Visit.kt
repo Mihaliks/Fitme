@@ -10,7 +10,6 @@ import java.time.LocalDate
     tableName = "visits"
 )
 
-@TypeConverters(Converters::class)
 data class Visit(
     @PrimaryKey(autoGenerate = true) val id: Int,
     @ColumnInfo(name = "date") val date: LocalDate,

@@ -2,28 +2,17 @@ package com.example.fitme.data.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.ForeignKey
-import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.fitme.data.entities.enums.BodyRegion
+import com.example.fitme.data.entities.enums.MuscleGroup
 
-@Entity(
-    tableName ="exercises",
-    foreignKeys = [
-        ForeignKey(
-            entity = Group::class,
-            parentColumns = ["id"],
-            childColumns = ["group_id"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
-    indices = [Index("group_id")]
-    )
+@Entity(tableName = "exercises")
 data class Exercise(
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    @ColumnInfo(name="name") val name: String,
-    @ColumnInfo(name="lastmax1") val lastmax1 : String,
-    @ColumnInfo(name="lastmax2") val lastmax2 : String,
-    @ColumnInfo(name="group_id") val groupId : Int, //это должно быть связано с Entity Group
-    @ColumnInfo(name="is_active") val isActive : Boolean,
-    @ColumnInfo(name="muscle") val muscle : String,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "lastmax1") val lastmax1: String? = null,
+    @ColumnInfo(name = "lastmax2") val lastmax2: String? = null,
+    @ColumnInfo(name = "body_region") val bodyRegion: BodyRegion,
+    @ColumnInfo(name = "is_active") val isActive: Boolean = true,
+    @ColumnInfo(name = "muscle") val muscle: MuscleGroup? = null
 )
