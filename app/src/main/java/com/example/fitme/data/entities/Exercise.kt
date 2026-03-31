@@ -10,6 +10,7 @@ import com.example.fitme.data.entities.enums.MuscleGroup
 data class Exercise(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo(name = "name") val name: String,
+    // Под последним максимумом подразумевается рекорд на определенное количество повторений.
     @ColumnInfo(name = "lastmax1") val lastmax1: String? = null,
     @ColumnInfo(name = "lastmax2") val lastmax2: String? = null,
     @ColumnInfo(name = "body_region") val bodyRegion: BodyRegion,

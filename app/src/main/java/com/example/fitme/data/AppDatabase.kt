@@ -5,21 +5,20 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.fitme.data.entities.Exercise
-import com.example.fitme.data.entities.ExerciseToDo
-import com.example.fitme.data.entities.Plan
-import com.example.fitme.data.entities.WorkoutSession
-import com.example.fitme.data.entities.WorkoutTemplate
+import com.example.fitme.data.entities.*;
 import com.example.fitme.data.entities.converters.Converter
 
 // TODO : Заполнить полный список сущностей и DAO, а также добавить миграции при необходимости
 @Database(
     entities = [
-        Plan::class,
-        WorkoutTemplate::class,
-        WorkoutSession::class,
+        Exercise::class,
         ExerciseToDo::class,
-        Exercise::class
+        Note::class,
+        Plan::class,
+        User::class,
+        Visit::class,
+        WorkoutSession::class,
+        WorkoutTemplate::class
     ],
     version = 1,
     exportSchema = false

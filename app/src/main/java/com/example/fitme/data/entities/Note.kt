@@ -5,7 +5,6 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverters
 import java.time.LocalDate
 
 //Записи дневника о силовых показателях в определенный день, по сути.
