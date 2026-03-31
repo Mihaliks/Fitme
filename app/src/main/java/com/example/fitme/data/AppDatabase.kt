@@ -5,7 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.fitme.data.entities.*;
+import com.example.fitme.data.entities.Exercise
+import com.example.fitme.data.entities.ExerciseToDo
+import com.example.fitme.data.entities.Note
+import com.example.fitme.data.entities.Plan
+import com.example.fitme.data.entities.User
+import com.example.fitme.data.entities.Visit
+import com.example.fitme.data.entities.WorkoutSession
+import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.converters.Converter
 
 // TODO : Заполнить полный список сущностей и DAO, а также добавить миграции при необходимости
@@ -36,10 +43,11 @@ abstract class AppDatabase : RoomDatabase() {
         fun getInstance(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "fitme_database"
-                ).build().also { instance = it }
+                                context.applicationContext,
+                                AppDatabase::class.java,
+                                "fitme_database"
+                            ).fallbackToDestructiveMigration(true) //версия бд не совпадает -> пересборка с нуля
+                    .build().also { instance = it }
             }
     }
 }
