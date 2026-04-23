@@ -5,6 +5,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.example.fitme.data.dao.ExerciseDao
+import com.example.fitme.data.dao.ExerciseToDoDao
+import com.example.fitme.data.dao.NoteDao
+import com.example.fitme.data.dao.UserDao
+import com.example.fitme.data.dao.VisitDao
+import com.example.fitme.data.dao.WorkoutPlanDao
+import com.example.fitme.data.dao.WorkoutSessionDao
 import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Note
@@ -15,7 +22,15 @@ import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.converters.Converter
 
-// TODO : Заполнить полный список сущностей и DAO, а также добавить миграции при необходимости
+
+// TODO : Инициализация базы — заполнение данными по умолчанию при создании. Причем такие данные сделать неизменяемыми.
+// TODO : Тесты data слоя
+// TODO : При необходимости сделать WorkoutRepository, ExerciseRepository и UserRepository. Они будут иметь более сложную бизнес логику и состаять из составных dao вызовов.
+// TODO : Миграции — после первых тестов.
+// На уровне идей для расширения:
+// Hilt - автоматическое внедрение зависимостей.
+// Подключение синхронизации с облаком и другими устройствами. Проверка наличия подписки.
+
 @Database(
     entities = [
         Exercise::class,
@@ -33,8 +48,13 @@ import com.example.fitme.data.entities.converters.Converter
 @TypeConverters(Converter::class)
 abstract class AppDatabase : RoomDatabase() {
 
-    // TODO: Вот тут накидать все DAO
-    // abstract fun planDao(): PlanDao
+    abstract fun workoutPlanDao(): WorkoutPlanDao
+    abstract fun exerciseDao(): ExerciseDao
+    abstract fun exerciseToDoDao(): ExerciseToDoDao
+    abstract fun noteDao(): NoteDao
+    abstract fun userDao(): UserDao
+    abstract fun visitDao(): VisitDao
+    abstract fun workoutSessionDao(): WorkoutSessionDao
 
     companion object {
         @Volatile
