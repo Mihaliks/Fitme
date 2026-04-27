@@ -10,7 +10,7 @@ import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.relations.PlanWithWorkouts
 import com.example.fitme.data.repositories.WorkoutRepository
-import junit.framework.Assert.assertEquals
+import org.junit.Assert.assertEquals
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -35,10 +35,7 @@ class WorkoutRepositoryUnitTest {
             .allowMainThreadQueries()
             .build()
 
-        repository = WorkoutRepository(
-            workoutPlanDao = db.workoutPlanDao(),
-            workoutSessionDao = db.workoutSessionDao()
-        )
+        repository = WorkoutRepository(db)
     }
 
     @After
@@ -64,6 +61,39 @@ class WorkoutRepositoryUnitTest {
         runBlocking {
             val planId: Int = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
             db.workoutPlanDao().insertWorkoutTemplate(WorkoutTemplate(name = "Ноги", planId = planId + 1, order = 1))
+        }
+    }
+
+    @Test
+    fun appendWorkoutTemplate() {
+        runBlocking {
+            val planId: Int = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
+            repository.appendWorkoutTemplate("Ноги", planId)
+            repository.appendWorkoutTemplate("Бицепс спина", planId)
+            repository.appendWorkoutTemplate("Грудь трицепс", planId)
+            val plan: PlanWithWorkouts? = repository.getWorkoutTemplatesByPlanId(planId)
+            assert(plan != null)
+            assertEquals(plan!!.workoutTemplates.size,3)
+            assertEquals(plan.workoutTemplates[0].order,1)
+            assertEquals(plan.workoutTemplates[1].order,2)
+            assertEquals(plan.workoutTemplates[2].order,3)
+        }
+    }
+
+    @Test
+    fun reorderWorkoutTemplates() {
+        runBlocking {
+            val planId: Int = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
+            val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
+            val id2 = repository.appendWorkoutTemplate("Бицепс спина", planId).toInt()
+            val id3 = repository.appendWorkoutTemplate("Грудь трицепс", planId).toInt()
+            repository.reorderWorkoutTemplates(listOf(id3, id1, id2))
+            val plan: PlanWithWorkouts? = repository.getWorkoutTemplatesByPlanId(planId)
+            assert(plan != null)
+            assertEquals(plan!!.workoutTemplates.size,3)
+            assertEquals(plan.workoutTemplates[id3-1].order,1)
+            assertEquals(plan.workoutTemplates[id1-1].order,2)
+            assertEquals(plan.workoutTemplates[id2-1].order,3)
         }
     }
 }
