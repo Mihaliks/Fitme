@@ -24,6 +24,7 @@ data class Note (
     @PrimaryKey(autoGenerate = true) val id: Int,
     @ColumnInfo(name="date") val date: LocalDate,
     @ColumnInfo(name="exercise_id") val exerciseId : Int,
-    @ColumnInfo(name="max1") val max1 : String?,
-    @ColumnInfo(name="max2") val max2 : String?
+    @ColumnInfo(name="reps") val reps : String?,
+    @ColumnInfo(name="weight") val weight : String?,
+    @ColumnInfo(name="duration") val duration : String?
     )

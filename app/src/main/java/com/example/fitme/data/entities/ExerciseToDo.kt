@@ -5,6 +5,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.fitme.data.entities.enums.TrainingMode
+import java.time.LocalDate
 
 @Entity(
     tableName = "exercises_todo",
@@ -24,6 +26,12 @@ import androidx.room.PrimaryKey
     ],
     indices = [Index("workout_template_id"), Index("exercise_id")]
 )
+
+//TODO реализовать создание тренировки,  добавить режим "периодизации"
+//TODO реализовать режим суперсета (тут скорее визуальное изменение, нужно показывать не конкретное упражнение, а сразу группу
+/*тут важно придумать смысл автогенерации бесконечных тренировок, сначала создается программа тренировок
+она заполняется списком ExerciseToDo выбранным, и в дальнейшем
+ */
 data class ExerciseToDo(
     @PrimaryKey(autoGenerate = true) val id: Int,
     @ColumnInfo(name = "exercise_id") val exerciseId: Int,
@@ -32,5 +40,7 @@ data class ExerciseToDo(
     val reps: Int,
     val weight: Double? = null,
     val duration: Int? = null,
-    val order: Int
+    val order: Int,
+    val trainingMode: TrainingMode,
+    val customTrainingModeName: String? = null
 )
