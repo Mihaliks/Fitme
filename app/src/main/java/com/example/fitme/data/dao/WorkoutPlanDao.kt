@@ -70,4 +70,24 @@ abstract class WorkoutPlanDao {
     @Query("UPDATE workout_templates SET `order` = :newOrder WHERE id = :id")
     abstract suspend fun setWorkoutTemplateOrder(id: Int, newOrder: Int)
 
+    @Query(
+        """
+        SELECT * FROM workout_templates
+        WHERE plan_id = :planId AND `order` > :afterOrder
+        ORDER BY `order` ASC
+        LIMIT 1
+        """
+    )
+    abstract suspend fun getNextWorkoutTemplateAfter(planId: Int, afterOrder: Int): WorkoutTemplate?
+
+    @Query(
+        """
+        SELECT * FROM workout_templates
+        WHERE plan_id = :planId
+        ORDER BY `order` ASC
+        LIMIT 1
+        """
+    )
+    abstract suspend fun getFirstWorkoutTemplate(planId: Int): WorkoutTemplate?
+
 }
