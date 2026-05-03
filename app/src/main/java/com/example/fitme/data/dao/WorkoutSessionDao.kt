@@ -1,5 +1,6 @@
 package com.example.fitme.data.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -23,7 +24,7 @@ interface WorkoutSessionDao {
     suspend fun deleteWorkoutSession(workoutSession: WorkoutSession)
 
     @Query("SELECT * FROM workout_sessions ORDER BY date DESC")
-    fun getAllWorkoutSessions(): Flow<List<WorkoutSession>>
+    fun getAllWorkoutSessions(): PagingSource<Int, WorkoutSession>
 
     @Query("SELECT * FROM workout_sessions WHERE workout_template_id = :workoutTemplateId ORDER BY date DESC")
     fun getWorkoutSessionsForTemplate(workoutTemplateId: Int): Flow<List<WorkoutSession>>

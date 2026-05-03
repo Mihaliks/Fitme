@@ -9,7 +9,7 @@ class WorkoutRepository(private val db: AppDatabase) {
     private val workoutPlanDao = db.workoutPlanDao()
     private val workoutSessionDao = db.workoutSessionDao()
 
-    //прочитать тренировки по плану
+    //прочитать список тренировок по id плана
     suspend fun getWorkoutTemplatesByPlanId(planId: Int): PlanWithWorkouts? =
         workoutPlanDao.getPlanWithWorkouts(planId)
 
@@ -25,4 +25,14 @@ class WorkoutRepository(private val db: AppDatabase) {
             }
         }
     }
+
+    //прочитать упражнения в тренировке по шаблону тренировки
+    suspend fun getExercisesByWorkoutTemplateId(workoutTemplateId: Int) =
+        workoutPlanDao.getWorkoutWithExercises(workoutTemplateId)
+
+    //создать следующую тренировку на основе предыдущей тренировки с таким же order в плане:
+    suspend fun createNextWorkoutSession(planId: Intну ){
+
+    }
+
 }
