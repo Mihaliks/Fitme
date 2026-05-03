@@ -29,6 +29,30 @@ interface WorkoutSessionDao {
     @Query("SELECT * FROM workout_sessions WHERE workout_template_id = :workoutTemplateId ORDER BY date DESC")
     fun getWorkoutSessionsForTemplate(workoutTemplateId: Int): Flow<List<WorkoutSession>>
 
+
+    // получить прошлую(последнюю) сессию этого типа
+    @Query(
+        """
+        SELECT * FROM workout_sessions
+        WHERE workout_template_id = :workoutTemplateId
+        ORDER BY date DESC, id DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getLastSessionForTemplate(workoutTemplateId: Int): WorkoutSession?
+
+    // получить последнюю сессию в плане (для создания следующей сессии)
+    @Query(
+        """
+        SELECT ws.* FROM workout_sessions ws
+        JOIN workout_templates wt ON wt.id = ws.workout_template_id
+        WHERE wt.plan_id = :planId
+        ORDER BY ws.date DESC, ws.id DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getLastSessionForPlan(planId: Int): WorkoutSession?
+
     @Query("SELECT * FROM workout_sessions WHERE id = :workoutSessionId")
     suspend fun getWorkoutSessionById(workoutSessionId: Int): WorkoutSession?
 
