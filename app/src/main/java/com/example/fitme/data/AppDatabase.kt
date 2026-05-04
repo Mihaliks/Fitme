@@ -9,7 +9,6 @@ import com.example.fitme.data.dao.ExerciseDao
 import com.example.fitme.data.dao.ExerciseToDoDao
 import com.example.fitme.data.dao.NoteDao
 import com.example.fitme.data.dao.UserDao
-import com.example.fitme.data.dao.VisitDao
 import com.example.fitme.data.dao.WorkoutPlanDao
 import com.example.fitme.data.dao.WorkoutSessionDao
 import com.example.fitme.data.entities.Exercise
@@ -17,7 +16,6 @@ import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Note
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.User
-import com.example.fitme.data.entities.Visit
 import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.converters.Converter
@@ -38,7 +36,6 @@ import com.example.fitme.data.entities.converters.Converter
         Note::class,
         Plan::class,
         User::class,
-        Visit::class,
         WorkoutSession::class,
         WorkoutTemplate::class
     ],
@@ -53,7 +50,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun exerciseToDoDao(): ExerciseToDoDao
     abstract fun noteDao(): NoteDao
     abstract fun userDao(): UserDao
-    abstract fun visitDao(): VisitDao
     abstract fun workoutSessionDao(): WorkoutSessionDao
 
     companion object {
