@@ -25,7 +25,6 @@ abstract class NoteDao {
     @Query("SELECT * FROM notes WHERE id = :noteId")
     abstract suspend fun getNoteById(noteId: Int): Note?
 
-    // Все Note конкретного типа упражнения каталога для построения статистики
     @Query(
         """
         SELECT n.* FROM notes n
@@ -37,7 +36,6 @@ abstract class NoteDao {
     )
     abstract fun getNotesForExercise(exerciseId: Int): Flow<List<Note>>
 
-    // Сеты конкретного упражнения в конкретной сессии
     @Query(
         """
         SELECT * FROM notes
@@ -50,7 +48,6 @@ abstract class NoteDao {
         exerciseToDoId: Int,
     ): Flow<List<Note>>
 
-    // Найти ID последней сессии, в которой данный ExerciseToDo выполнялся в указанном режиме.
     @Query(
         """
         SELECT ws.id FROM workout_sessions ws
@@ -65,7 +62,6 @@ abstract class NoteDao {
         mode: TrainingMode,
     ): Int?
 
-    // Все сеты упражнения в этой найденной сессии — это и есть «как было в прошлый раз».
     @Query(
         """
         SELECT * FROM notes
@@ -84,8 +80,6 @@ abstract class NoteDao {
         return getNotesForExerciseInSessionOnce(sessionId, exerciseToDoId)
     }
 
-    // Какой режим использовался в последний раз для этого слота — независимо от того, какой именно.
-    // Нужно для чередования периодизации.
     @Query(
         """
         SELECT n.mode_used FROM notes n
@@ -108,7 +102,6 @@ abstract class NoteDao {
         exerciseToDoId: Int,
     ): Int?
 
-    // Сохранить ещё один сет: setIndex считается автоматически как MAX+1 по паре (session, todo).
     @Transaction
     open suspend fun appendNote(
         workoutSessionId: Int,

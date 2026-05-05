@@ -30,7 +30,6 @@ interface WorkoutSessionDao {
     fun getWorkoutSessionsForTemplate(workoutTemplateId: Int): Flow<List<WorkoutSession>>
 
 
-    // получить прошлую(последнюю) сессию этого типа
     @Query(
         """
         SELECT * FROM workout_sessions
@@ -41,7 +40,6 @@ interface WorkoutSessionDao {
     )
     suspend fun getLastSessionForTemplate(workoutTemplateId: Int): WorkoutSession?
 
-    // получить последнюю сессию в плане (для создания следующей сессии)
     @Query(
         """
         SELECT ws.* FROM workout_sessions ws

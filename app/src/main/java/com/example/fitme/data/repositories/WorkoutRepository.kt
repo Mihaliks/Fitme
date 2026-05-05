@@ -5,6 +5,7 @@ import com.example.fitme.data.AppDatabase
 import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Note
+import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.TrainingMode
@@ -21,6 +22,8 @@ class WorkoutRepository(private val db: AppDatabase) {
     suspend fun getWorkoutTemplatesByPlanId(planId: Int): PlanWithWorkouts? =
         workoutPlanDao.getPlanWithWorkouts(planId)
 
+    //создать новый план
+    suspend fun createNewPlan(name: String): Long = workoutPlanDao.insertPlan(Plan(name=name))
     //добавить тренировку в конец плана
     suspend fun appendWorkoutTemplate(name: String, planId: Int): Long =
         workoutPlanDao.appendWorkoutTemplate(name, planId)
