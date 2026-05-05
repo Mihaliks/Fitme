@@ -25,10 +25,21 @@ interface ExerciseToDoDao {
     @Query("SELECT * FROM exercises_todo WHERE id = :exerciseToDoId")
     suspend fun getExerciseToDoById(exerciseToDoId: Int): ExerciseToDo?
 
+    /*
     @Query("SELECT * FROM exercises_todo WHERE workout_template_id = :workoutTemplateId ORDER BY `order`")
     fun getExercisesToDoForWorkout(workoutTemplateId: Int): Flow<List<ExerciseToDo>>
 
     @Transaction
     @Query("SELECT * FROM exercises_todo WHERE workout_template_id = :workoutTemplateId ORDER BY `order`")
     fun getExerciseDetailsForWorkout(workoutTemplateId: Int): Flow<List<ExerciseWithDetails>>
+*/
+    @Transaction
+    @Query("""
+      SELECT * FROM exercises_todo
+      WHERE workout_template_id = :workoutTemplateId
+      ORDER BY `order`
+  """)
+    suspend fun getExerciseDetailsForWorkoutOnce(
+        workoutTemplateId: Int
+    ): List<ExerciseWithDetails>
 }

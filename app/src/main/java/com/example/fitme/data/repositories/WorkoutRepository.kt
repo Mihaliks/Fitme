@@ -16,7 +16,17 @@ class WorkoutRepository(private val db: AppDatabase) {
 
     private val workoutPlanDao = db.workoutPlanDao()
     private val workoutSessionDao = db.workoutSessionDao()
+    private val exerciseToDoDao = db.exerciseToDoDao()
     private val noteDao = db.noteDao()
+
+
+    //TODO fun получить список активных планов, список неактивных планов, список всех планов
+    //TODO fun удалить план (каскадно вместе с WorkoutTemplate и ExerciseToDo)
+    //TODO fun обновить план
+    //TODO fun удалить тренировку из плана (каскадно вместе с ExerciseToDo)
+    //TODO fun создать упражнениe, reorder упражений в тренировке плана (подобно appendWorkoutTemplate, reorderWorkoutTemplates)
+    //TODO fun изменить, удалить упражнение в тренировке плана
+
 
     //прочитать список тренировок по id плана
     suspend fun getWorkoutTemplatesByPlanId(planId: Int): PlanWithWorkouts? =
@@ -40,9 +50,8 @@ class WorkoutRepository(private val db: AppDatabase) {
     //показывает какая сессия будет создана, собирает сессию, но не создает запись в бд
     suspend fun peekNextWorkoutSession(planId: Int): NextWorkoutPreview? {
         val nextTemplate = pickNextTemplate(planId) ?: return null
-        val templateWithExercises = workoutPlanDao.getWorkoutWithExercises(nextTemplate.id)
-            ?: return null
-        val plans = templateWithExercises.exercises.map { details ->
+        val exercises = exerciseToDoDao.getExerciseDetailsForWorkoutOnce(nextTemplate.id)
+        val plans = exercises.map { details ->
             val etd = details.exerciseToDo
             val mode = chooseMode(etd)
             val planned = pickPlannedParams(etd, mode)
