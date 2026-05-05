@@ -27,6 +27,10 @@ abstract class WorkoutPlanDao {
     @Query("SELECT * FROM plans ORDER BY id")
     abstract fun getAllPlans(): Flow<List<Plan>>
 
+    @Query("SELECT * FROM plans WHERE isActive = 1 ORDER BY id")
+    abstract fun getAllActivePlans(): Flow<List<Plan>>
+    @Query("SELECT * FROM plans WHERE isActive = 0 ORDER BY id")
+    abstract fun getAllInactivePlans(): Flow<List<Plan>>
     @Query("SELECT * FROM plans WHERE id = :planId")
     abstract suspend fun getPlanById(planId: Int): Plan?
 
