@@ -325,4 +325,73 @@ class WorkoutSessionGenerationTest {
         assertEquals(listOf(1, 2, 3), notesEx1.map { it.setIndex })
         assertEquals(listOf(1, 2), notesEx2.map { it.setIndex })
     }
+
+    @Test
+    fun peekReturnsNullForEmptyPlan() = runBlocking {
+        val planId = newPlan()
+        assertNull(repository.peekNextWorkoutSession(planId))
+    }
+
+    @Test
+    fun peekReturnsFirstTemplateWhenNoSessionsYet() = runBlocking {
+        val planId = newPlan()
+        val firstId = newTemplate(planId, "Ноги", order = 1)
+        newTemplate(planId, "Верх", order = 2)
+
+        val preview = repository.peekNextWorkoutSession(planId)!!
+        assertEquals(firstId, preview.template.id)
+        assertEquals("Ноги", preview.template.name)
+    }
+
+    @Test
+    fun peekDoesNotCreateSession() = runBlocking {
+        val planId = newPlan()
+        newTemplate(planId, "Ноги", order = 1)
+        repository.peekNextWorkoutSession(planId)
+        val any = db.workoutSessionDao().getLastSessionForPlan(planId)
+        assertNull(any)
+    }
+
+    @Test
+    fun peekReturnsSameTemplateUntilSessionIsCreated() = runBlocking {
+        val planId = newPlan()
+        val firstId = newTemplate(planId, "Ноги", order = 1)
+        newTemplate(planId, "Верх", order = 2)
+
+        val a = repository.peekNextWorkoutSession(planId)!!
+        val b = repository.peekNextWorkoutSession(planId)!!
+        assertEquals(firstId, a.template.id)
+        assertEquals(firstId, b.template.id)
+    }
+
+    @Test
+    fun peekAdvancesAfterCreateNextWorkoutSession() = runBlocking {
+        val planId = newPlan()
+        val firstId = newTemplate(planId, "Ноги", order = 1)
+        val secondId = newTemplate(planId, "Верх", order = 2)
+
+        val before = repository.peekNextWorkoutSession(planId)!!
+        assertEquals(firstId, before.template.id)
+
+        repository.createNextWorkoutSession(planId)
+
+        val after = repository.peekNextWorkoutSession(planId)!!
+        assertEquals(secondId, after.template.id)
+    }
+
+    @Test
+    fun peekIncludesExercisesAndPlannedParams() = runBlocking {
+        val planId = newPlan()
+        val templateId = newTemplate(planId, "Ноги", order = 1)
+        val exerciseId = newExercise(name = "Присед")
+        newExerciseToDo(templateId, exerciseId, sets = 4, reps = 6, weight = 100.0)
+
+        val preview = repository.peekNextWorkoutSession(planId)!!
+        val ex = preview.exercises.single()
+        assertNotNull(ex)
+        assertEquals("Присед", ex.exercise.name)
+        assertEquals(4, ex.plannedSets)
+        assertEquals(6, ex.plannedReps)
+        assertEquals(100.0, ex.plannedWeight!!, 0.0001)
+    }
 }

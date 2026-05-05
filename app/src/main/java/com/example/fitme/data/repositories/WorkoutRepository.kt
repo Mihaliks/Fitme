@@ -34,21 +34,11 @@ class WorkoutRepository(private val db: AppDatabase) {
         }
     }
 
-    //прочитать упражнения в тренировке по шаблону тренировки
-    suspend fun getExercisesByWorkoutTemplateId(workoutTemplateId: Int) =
-        workoutPlanDao.getWorkoutWithExercises(workoutTemplateId)
-
-    //функция для генерации следующей тренировки, берет прошлую тренировку, создает следующую, заполняет в каждом exerciseToDo значения, ссылаясь на имеющиеся.
-    suspend fun createNextWorkoutSession(planId: Int): NextWorkoutPlan? = db.withTransaction {
-        val nextTemplate = pickNextTemplate(planId) ?: return@withTransaction null
+    //показывает какая сессия будет создана, собирает сессию, но не создает запись в бд
+    suspend fun peekNextWorkoutSession(planId: Int): NextWorkoutPreview? {
+        val nextTemplate = pickNextTemplate(planId) ?: return null
         val templateWithExercises = workoutPlanDao.getWorkoutWithExercises(nextTemplate.id)
-            ?: return@withTransaction null
-        val sessionId = workoutSessionDao.insertWorkoutSession(
-            WorkoutSession(
-                workoutTemplateId = nextTemplate.id,
-                date = LocalDate.now(),
-            )
-        ).toInt()
+            ?: return null
         val plans = templateWithExercises.exercises.map { details ->
             val etd = details.exerciseToDo
             val mode = chooseMode(etd)
@@ -64,10 +54,24 @@ class WorkoutRepository(private val db: AppDatabase) {
                 prefillNotes = prefill,
             )
         }
+        return NextWorkoutPreview(template = nextTemplate, exercises = plans)
+    }
+
+
+    //создает экземпляр сессии и запускает тренировку.
+    suspend fun createNextWorkoutSession(planId: Int): NextWorkoutPlan? = db.withTransaction {
+        val preview = peekNextWorkoutSession(planId) ?: return@withTransaction null
+        val sessionId = workoutSessionDao.insertWorkoutSession(
+            WorkoutSession(
+                workoutTemplateId = preview.template.id,
+                date = LocalDate.now(),
+            )
+        ).toInt()
+
         NextWorkoutPlan(
             sessionId = sessionId,
-            template = nextTemplate,
-            exercises = plans,
+            template = preview.template,
+            exercises = preview.exercises,
         )
     }
 
@@ -118,6 +122,12 @@ class WorkoutRepository(private val db: AppDatabase) {
 }
 
 // сущности для выкидывания во фронтенд
+
+data class NextWorkoutPreview(
+    val template: WorkoutTemplate,
+    val exercises: List<NextExercisePlan>,
+)
+
 data class NextWorkoutPlan(
     val sessionId: Int,
     val template: WorkoutTemplate,
