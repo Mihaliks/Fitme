@@ -17,7 +17,7 @@ class WorkoutRepository(private val db: AppDatabase) {
     private val workoutPlanDao = db.workoutPlanDao()
     private val workoutSessionDao = db.workoutSessionDao()
     private val exerciseToDoDao = db.exerciseToDoDao()
-    private val noteDao = db.noteDao()
+    private val noteRepository = NoteRepository(db)
 
 
     //TODO fun получить список активных планов, список неактивных планов, список всех планов
@@ -55,7 +55,7 @@ class WorkoutRepository(private val db: AppDatabase) {
             val etd = details.exerciseToDo
             val mode = chooseMode(etd)
             val planned = pickPlannedParams(etd, mode)
-            val prefill = noteDao.getLastNotesByMode(etd.id, mode)
+            val prefill = noteRepository.getLastNotesByMode(etd.id, mode)
             NextExercisePlan(
                 exerciseToDo = etd,
                 exercise = details.exercise,
@@ -103,7 +103,7 @@ class WorkoutRepository(private val db: AppDatabase) {
         val a = etd.modeA
         val b = etd.modeB
         if (a == null || b == null || a == b) return etd.trainingMode
-        return when (noteDao.getLastModeFor(etd.id)) {
+        return when (noteRepository.getLastModeFor(etd.id)) {
             a -> b
             b -> a
             else -> a

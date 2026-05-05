@@ -4,26 +4,25 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
-import androidx.room.Transaction
 import androidx.room.Update
 import com.example.fitme.data.entities.Note
 import com.example.fitme.data.entities.enums.TrainingMode
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-abstract class NoteDao {
+interface NoteDao {
 
     @Insert
-    abstract suspend fun insertNote(note: Note): Long
+    suspend fun insertNote(note: Note): Long
 
     @Update
-    abstract suspend fun updateNote(note: Note)
+    suspend fun updateNote(note: Note)
 
     @Delete
-    abstract suspend fun deleteNote(note: Note)
+    suspend fun deleteNote(note: Note)
 
     @Query("SELECT * FROM notes WHERE id = :noteId")
-    abstract suspend fun getNoteById(noteId: Int): Note?
+    suspend fun getNoteById(noteId: Int): Note?
 
     @Query(
         """
@@ -34,7 +33,7 @@ abstract class NoteDao {
         ORDER BY ws.date DESC, n.set_index ASC
         """
     )
-    abstract fun getNotesForExercise(exerciseId: Int): Flow<List<Note>>
+    fun getNotesForExercise(exerciseId: Int): Flow<List<Note>>
 
     @Query(
         """
@@ -43,7 +42,7 @@ abstract class NoteDao {
         ORDER BY set_index ASC
         """
     )
-    abstract fun getNotesForExerciseInSession(
+    fun getNotesForExerciseInSession(
         workoutSessionId: Int,
         exerciseToDoId: Int,
     ): Flow<List<Note>>
@@ -57,7 +56,7 @@ abstract class NoteDao {
         LIMIT 1
         """
     )
-    protected abstract suspend fun findLastSessionIdWithMode(
+    suspend fun findLastSessionIdWithMode(
         exerciseToDoId: Int,
         mode: TrainingMode,
     ): Int?
@@ -69,16 +68,10 @@ abstract class NoteDao {
         ORDER BY set_index ASC
         """
     )
-    protected abstract suspend fun getNotesForExerciseInSessionOnce(
+    suspend fun getNotesForExerciseInSessionOnce(
         workoutSessionId: Int,
         exerciseToDoId: Int,
     ): List<Note>
-
-    @Transaction
-    open suspend fun getLastNotesByMode(exerciseToDoId: Int, mode: TrainingMode): List<Note> {
-        val sessionId = findLastSessionIdWithMode(exerciseToDoId, mode) ?: return emptyList()
-        return getNotesForExerciseInSessionOnce(sessionId, exerciseToDoId)
-    }
 
     @Query(
         """
@@ -89,7 +82,7 @@ abstract class NoteDao {
         LIMIT 1
         """
     )
-    abstract suspend fun getLastModeFor(exerciseToDoId: Int): TrainingMode?
+    suspend fun getLastModeFor(exerciseToDoId: Int): TrainingMode?
 
     @Query(
         """
@@ -97,31 +90,8 @@ abstract class NoteDao {
         WHERE workout_session_id = :workoutSessionId AND exercise_to_do_id = :exerciseToDoId
         """
     )
-    protected abstract suspend fun getMaxSetIndex(
+    suspend fun getMaxSetIndex(
         workoutSessionId: Int,
         exerciseToDoId: Int,
     ): Int?
-
-    @Transaction
-    open suspend fun appendNote(
-        workoutSessionId: Int,
-        exerciseToDoId: Int,
-        modeUsed: TrainingMode,
-        reps: Int? = null,
-        weight: Double? = null,
-        duration: Int? = null,
-    ): Long {
-        val nextIndex = (getMaxSetIndex(workoutSessionId, exerciseToDoId) ?: 0) + 1
-        return insertNote(
-            Note(
-                exerciseToDoId = exerciseToDoId,
-                workoutSessionId = workoutSessionId,
-                setIndex = nextIndex,
-                modeUsed = modeUsed,
-                reps = reps,
-                weight = weight,
-                duration = duration,
-            )
-        )
-    }
 }

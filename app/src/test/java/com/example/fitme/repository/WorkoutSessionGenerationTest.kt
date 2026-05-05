@@ -11,6 +11,7 @@ import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.enums.TrainingMode
+import com.example.fitme.data.repositories.NoteRepository
 import com.example.fitme.data.repositories.WorkoutRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -29,6 +30,7 @@ class WorkoutSessionGenerationTest {
 
     private lateinit var db: AppDatabase
     private lateinit var repository: WorkoutRepository
+    private lateinit var noteRepository: NoteRepository
 
     @Before
     fun setup() {
@@ -37,6 +39,7 @@ class WorkoutSessionGenerationTest {
             .allowMainThreadQueries()
             .build()
         repository = WorkoutRepository(db)
+        noteRepository = NoteRepository(db)
     }
 
     @After
@@ -195,11 +198,11 @@ class WorkoutSessionGenerationTest {
 
         val s1 = repository.createNextWorkoutSession(planId)!!
         assertEquals(TrainingMode.STRENGTH, s1.exercises.single().chosenMode)
-        db.noteDao().appendNote(s1.sessionId, todoId, TrainingMode.STRENGTH, reps = 5, weight = 100.0)
+        noteRepository.appendNote(s1.sessionId, todoId, TrainingMode.STRENGTH, reps = 5, weight = 100.0)
 
         val s2 = repository.createNextWorkoutSession(planId)!!
         assertEquals(TrainingMode.HYPERTROPHY, s2.exercises.single().chosenMode)
-        db.noteDao().appendNote(s2.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 10, weight = 70.0)
+        noteRepository.appendNote(s2.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 10, weight = 70.0)
 
         val s3 = repository.createNextWorkoutSession(planId)!!
         assertEquals(TrainingMode.STRENGTH, s3.exercises.single().chosenMode)
@@ -225,7 +228,7 @@ class WorkoutSessionGenerationTest {
         assertEquals(5, ex1.plannedSets)
         assertEquals(5, ex1.plannedReps)
         assertEquals(120.0, ex1.plannedWeight!!, 0.0001)
-        db.noteDao().appendNote(s1.sessionId, todoId, TrainingMode.STRENGTH, reps = 5, weight = 120.0)
+        noteRepository.appendNote(s1.sessionId, todoId, TrainingMode.STRENGTH, reps = 5, weight = 120.0)
 
         val s2 = repository.createNextWorkoutSession(planId)!!
         val ex2 = s2.exercises.single()
@@ -261,12 +264,12 @@ class WorkoutSessionGenerationTest {
 
         val s1 = repository.createNextWorkoutSession(planId)!!
         repeat(3) {
-            db.noteDao().appendNote(s1.sessionId, todoId, TrainingMode.STRENGTH, reps = 5, weight = 100.0)
+            noteRepository.appendNote(s1.sessionId, todoId, TrainingMode.STRENGTH, reps = 5, weight = 100.0)
         }
 
         val s2 = repository.createNextWorkoutSession(planId)!!
         repeat(3) {
-            db.noteDao().appendNote(s2.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 10, weight = 70.0)
+            noteRepository.appendNote(s2.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 10, weight = 70.0)
         }
 
         // снова STRENGTH; prefill должен показать 3 сета по 5x100, не гипертрофию
@@ -291,13 +294,12 @@ class WorkoutSessionGenerationTest {
         val todoId = newExerciseToDo(templateId, exerciseId)
 
         val s = repository.createNextWorkoutSession(planId)!!
-        val noteDao = db.noteDao()
 
-        noteDao.appendNote(s.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 8, weight = 50.0)
-        noteDao.appendNote(s.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 9, weight = 50.0)
-        noteDao.appendNote(s.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 7, weight = 52.5)
+        noteRepository.appendNote(s.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 8, weight = 50.0)
+        noteRepository.appendNote(s.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 9, weight = 50.0)
+        noteRepository.appendNote(s.sessionId, todoId, TrainingMode.HYPERTROPHY, reps = 7, weight = 52.5)
 
-        val notes = noteDao.getLastNotesByMode(todoId, TrainingMode.HYPERTROPHY)
+        val notes = noteRepository.getLastNotesByMode(todoId, TrainingMode.HYPERTROPHY)
         assertEquals(listOf(1, 2, 3), notes.map { it.setIndex })
     }
 
@@ -311,17 +313,16 @@ class WorkoutSessionGenerationTest {
         val todoId2 = newExerciseToDo(templateId, exerciseId2, order = 2)
 
         val s = repository.createNextWorkoutSession(planId)!!
-        val noteDao = db.noteDao()
 
         // вперемешку: жим, тяга, жим, тяга, жим — у каждого свой счётчик
-        noteDao.appendNote(s.sessionId, todoId1, TrainingMode.HYPERTROPHY, reps = 8, weight = 50.0)
-        noteDao.appendNote(s.sessionId, todoId2, TrainingMode.HYPERTROPHY, reps = 8, weight = 60.0)
-        noteDao.appendNote(s.sessionId, todoId1, TrainingMode.HYPERTROPHY, reps = 8, weight = 50.0)
-        noteDao.appendNote(s.sessionId, todoId2, TrainingMode.HYPERTROPHY, reps = 8, weight = 60.0)
-        noteDao.appendNote(s.sessionId, todoId1, TrainingMode.HYPERTROPHY, reps = 7, weight = 50.0)
+        noteRepository.appendNote(s.sessionId, todoId1, TrainingMode.HYPERTROPHY, reps = 8, weight = 50.0)
+        noteRepository.appendNote(s.sessionId, todoId2, TrainingMode.HYPERTROPHY, reps = 8, weight = 60.0)
+        noteRepository.appendNote(s.sessionId, todoId1, TrainingMode.HYPERTROPHY, reps = 8, weight = 50.0)
+        noteRepository.appendNote(s.sessionId, todoId2, TrainingMode.HYPERTROPHY, reps = 8, weight = 60.0)
+        noteRepository.appendNote(s.sessionId, todoId1, TrainingMode.HYPERTROPHY, reps = 7, weight = 50.0)
 
-        val notesEx1 = noteDao.getLastNotesByMode(todoId1, TrainingMode.HYPERTROPHY)
-        val notesEx2 = noteDao.getLastNotesByMode(todoId2, TrainingMode.HYPERTROPHY)
+        val notesEx1 = noteRepository.getLastNotesByMode(todoId1, TrainingMode.HYPERTROPHY)
+        val notesEx2 = noteRepository.getLastNotesByMode(todoId2, TrainingMode.HYPERTROPHY)
         assertEquals(listOf(1, 2, 3), notesEx1.map { it.setIndex })
         assertEquals(listOf(1, 2), notesEx2.map { it.setIndex })
     }
