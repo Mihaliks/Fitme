@@ -8,7 +8,6 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
-import com.example.fitme.data.entities.relations.PlanWithWorkouts
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -33,14 +32,6 @@ abstract class WorkoutPlanDao {
     @Query("SELECT * FROM plans WHERE id = :planId")
     abstract suspend fun getPlanById(planId: Int): Plan?
 
-    @Transaction
-    @Query("SELECT * FROM plans ORDER BY id")
-    abstract fun getAllPlansWithWorkouts(): Flow<List<PlanWithWorkouts>>
-
-    @Transaction
-    @Query("SELECT * FROM plans WHERE id = :planId")
-    abstract suspend fun getPlanWithWorkouts(planId: Int): PlanWithWorkouts?
-
     @Insert
     abstract suspend fun insertWorkoutTemplate(workoutTemplate: WorkoutTemplate): Long
 
@@ -55,6 +46,9 @@ abstract class WorkoutPlanDao {
 
     @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
     abstract fun getWorkoutTemplatesForPlan(planId: Int): Flow<List<WorkoutTemplate>>
+
+    @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
+    abstract suspend fun getWorkoutTemplatesForPlanOnce(planId: Int): List<WorkoutTemplate>
 
     @Query("SELECT MAX(`order`) FROM workout_templates WHERE plan_id = :planId")
     protected abstract suspend fun getMaxOrderForPlan(planId: Int): Int?

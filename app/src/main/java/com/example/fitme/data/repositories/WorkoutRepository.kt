@@ -7,10 +7,10 @@ import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.TrainingMode
-import com.example.fitme.data.entities.relations.PlanWithWorkouts
 import com.example.fitme.data.models.NextExercisePlan
 import com.example.fitme.data.models.NextWorkoutPlan
 import com.example.fitme.data.models.NextWorkoutPreview
+import com.example.fitme.data.models.PlanWorkoutTemplates
 import java.time.LocalDate
 
 class WorkoutRepository(private val db: AppDatabase) {
@@ -30,8 +30,13 @@ class WorkoutRepository(private val db: AppDatabase) {
 
 
     //прочитать список тренировок по id плана
-    suspend fun getWorkoutTemplatesByPlanId(planId: Int): PlanWithWorkouts? =
-        workoutPlanDao.getPlanWithWorkouts(planId)
+    suspend fun getWorkoutTemplatesByPlanId(planId: Int): PlanWorkoutTemplates? {
+        val plan = workoutPlanDao.getPlanById(planId) ?: return null
+        return PlanWorkoutTemplates(
+            plan = plan,
+            workoutTemplates = workoutPlanDao.getWorkoutTemplatesForPlanOnce(planId),
+        )
+    }
 
     //создать новый план
     suspend fun createNewPlan(name: String): Long = workoutPlanDao.insertPlan(Plan(name=name))

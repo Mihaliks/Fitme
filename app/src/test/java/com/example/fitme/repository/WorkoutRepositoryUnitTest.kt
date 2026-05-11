@@ -8,7 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.fitme.data.AppDatabase
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
-import com.example.fitme.data.entities.relations.PlanWithWorkouts
+import com.example.fitme.data.models.PlanWorkoutTemplates
 import com.example.fitme.data.repositories.WorkoutRepository
 import org.junit.Assert.assertEquals
 import kotlinx.coroutines.runBlocking
@@ -50,7 +50,7 @@ class WorkoutRepositoryUnitTest {
             db.workoutPlanDao().insertWorkoutTemplate(WorkoutTemplate(name = "Ноги", planId = planId,order=1))
             db.workoutPlanDao().insertWorkoutTemplate(WorkoutTemplate(name = "Бицепс спина", planId = planId,order=2))
             db.workoutPlanDao().insertWorkoutTemplate(WorkoutTemplate(name = "Грудь трицепс", planId = planId,order=3))
-            val plan: PlanWithWorkouts? = repository.getWorkoutTemplatesByPlanId(planId)
+            val plan: PlanWorkoutTemplates? = repository.getWorkoutTemplatesByPlanId(planId)
             assert(plan != null)
             assertEquals(plan!!.workoutTemplates.size,3)
         }
@@ -71,7 +71,7 @@ class WorkoutRepositoryUnitTest {
             repository.appendWorkoutTemplate("Ноги", planId)
             repository.appendWorkoutTemplate("Бицепс спина", planId)
             repository.appendWorkoutTemplate("Грудь трицепс", planId)
-            val plan: PlanWithWorkouts? = repository.getWorkoutTemplatesByPlanId(planId)
+            val plan: PlanWorkoutTemplates? = repository.getWorkoutTemplatesByPlanId(planId)
             assert(plan != null)
             assertEquals(plan!!.workoutTemplates.size,3)
             assertEquals(plan.workoutTemplates[0].order,1)
@@ -88,12 +88,11 @@ class WorkoutRepositoryUnitTest {
             val id2 = repository.appendWorkoutTemplate("Бицепс спина", planId).toInt()
             val id3 = repository.appendWorkoutTemplate("Грудь трицепс", planId).toInt()
             repository.reorderWorkoutTemplates(listOf(id3, id1, id2))
-            val plan: PlanWithWorkouts? = repository.getWorkoutTemplatesByPlanId(planId)
+            val plan: PlanWorkoutTemplates? = repository.getWorkoutTemplatesByPlanId(planId)
             assert(plan != null)
             assertEquals(plan!!.workoutTemplates.size,3)
-            assertEquals(plan.workoutTemplates[id3-1].order,1)
-            assertEquals(plan.workoutTemplates[id1-1].order,2)
-            assertEquals(plan.workoutTemplates[id2-1].order,3)
+            assertEquals(listOf(id3, id1, id2), plan.workoutTemplates.map { it.id })
+            assertEquals(listOf(1, 2, 3), plan.workoutTemplates.map { it.order })
         }
     }
 }
