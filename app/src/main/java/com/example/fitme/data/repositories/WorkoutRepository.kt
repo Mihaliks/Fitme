@@ -2,14 +2,15 @@ package com.example.fitme.data.repositories
 
 import androidx.room.withTransaction
 import com.example.fitme.data.AppDatabase
-import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
-import com.example.fitme.data.entities.Note
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.entities.relations.PlanWithWorkouts
+import com.example.fitme.data.models.NextExercisePlan
+import com.example.fitme.data.models.NextWorkoutPlan
+import com.example.fitme.data.models.NextWorkoutPreview
 import java.time.LocalDate
 
 class WorkoutRepository(private val db: AppDatabase) {
@@ -132,27 +133,3 @@ class WorkoutRepository(private val db: AppDatabase) {
     // сущность для выкидывания во фронтенд
     private data class PlannedParams(val sets: Int, val reps: Int, val weight: Double?)
 }
-
-// сущности для выкидывания во фронтенд
-
-data class NextWorkoutPreview(
-    val template: WorkoutTemplate,
-    val exercises: List<NextExercisePlan>,
-)
-
-data class NextWorkoutPlan(
-    val sessionId: Int,
-    val template: WorkoutTemplate,
-    val exercises: List<NextExercisePlan>,
-)
-
-data class NextExercisePlan(
-    val exerciseToDo: ExerciseToDo,
-    val exercise: Exercise,
-    val chosenMode: TrainingMode,
-    val plannedSets: Int,
-    val plannedReps: Int,
-    val plannedWeight: Double?,
-    // Сеты предыдущей сессии того же режима — для подсказки в UI. Пусто, если истории нет.
-    val prefillNotes: List<Note>,
-)

@@ -17,6 +17,12 @@ class NoteRepository(private val db: AppDatabase) {
         exerciseToDoId: Int,
     ) = noteDao.getNotesForExerciseInSession(workoutSessionId, exerciseToDoId)
 
+    suspend fun getNotesForExerciseInSessionOnce(
+        workoutSessionId: Int,
+        exerciseToDoId: Int,
+    ): List<Note> =
+        noteDao.getNotesForExerciseInSessionOnce(workoutSessionId, exerciseToDoId)
+
     suspend fun getNoteById(noteId: Int): Note? =
         noteDao.getNoteById(noteId)
 
