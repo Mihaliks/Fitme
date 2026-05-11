@@ -32,10 +32,6 @@ class SessionRepository(private val db: AppDatabase) {
         ).flow
 
     }
-    //открыть информацию по прошедшей тренировке: список выполненных упражнений - List<ExerciseWithDetails> - упражнения и данные по конкретной тренировке
-    suspend fun getWorkoutSessionWithExercises(workoutSessionId: Int) =
-        workoutSessionDao.getWorkoutSessionWithExercises(workoutSessionId)
-
     suspend fun getWorkoutSessionHistory(workoutSessionId: Int): WorkoutSessionHistory? {
         val session = workoutSessionDao.getWorkoutSessionById(workoutSessionId)
             ?: return null

@@ -5,10 +5,8 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
-import androidx.room.Transaction
 import androidx.room.Update
 import com.example.fitme.data.entities.WorkoutSession
-import com.example.fitme.data.entities.relations.WorkoutSessionWithExercises
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -53,8 +51,4 @@ interface WorkoutSessionDao {
 
     @Query("SELECT * FROM workout_sessions WHERE id = :workoutSessionId")
     suspend fun getWorkoutSessionById(workoutSessionId: Int): WorkoutSession?
-
-    @Transaction
-    @Query("SELECT * FROM workout_sessions WHERE id = :workoutSessionId")
-    suspend fun getWorkoutSessionWithExercises(workoutSessionId: Int): WorkoutSessionWithExercises?
 }
