@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.example.fitme.ui.MainScreen // Импортируем твой созданный экран
+import com.example.fitme.ui.MainScreen
 import com.example.fitme.ui.theme.FitmeTheme
 
 class MainActivity : ComponentActivity() {
