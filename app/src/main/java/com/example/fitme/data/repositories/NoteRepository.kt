@@ -8,7 +8,8 @@ import com.example.fitme.data.entities.enums.TrainingMode
 class NoteRepository(private val db: AppDatabase) {
 
     private val noteDao = db.noteDao()
-
+    private val workoutSessionDao = db.workoutSessionDao()
+    private val exerciseToDoDao = db.exerciseToDoDao()
     fun getNotesForExercise(exerciseId: Int) =
         noteDao.getNotesForExercise(exerciseId)
 
@@ -52,6 +53,13 @@ class NoteRepository(private val db: AppDatabase) {
         weight: Double? = null,
         duration: Int? = null,
     ): Long = db.withTransaction {
+        val session = workoutSessionDao.getWorkoutSessionById(workoutSessionId)
+            ?: error("Workout session not found")
+        val exerciseToDo = exerciseToDoDao.getExerciseToDoById(exerciseToDoId)
+            ?: error("ExerciseToDo not found")
+        require(session.workoutTemplateId == exerciseToDo.workoutTemplateId) {
+            "ExerciseToDo does not belong to workout session template"
+        }
         val nextIndex = (noteDao.getMaxSetIndex(workoutSessionId, exerciseToDoId) ?: 0) + 1
         noteDao.insertNote(
             Note(
