@@ -49,11 +49,19 @@ class WorkoutRepository(private val db: AppDatabase) {
         workoutPlanDao.appendWorkoutTemplate(name, planId)
 
     //поменять список тренировок в новом порядке
-    suspend fun reorderWorkoutTemplates(orderedIds: List<Int>) {
-        db.withTransaction {
-            orderedIds.forEachIndexed { index, id ->
-                workoutPlanDao.setWorkoutTemplateOrder(id, index + 1)
-            }
+    suspend fun reorderWorkoutTemplates(
+        planId: Int,
+        orderedIds: List<Int>,
+    ) = db.withTransaction {
+        val currentIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(planId)
+        require(orderedIds.size == orderedIds.toSet().size) {
+            "Workout order contains duplicate ids"
+        }
+        require(orderedIds.toSet() == currentIds.toSet()) {
+            "Workout order must contain all and only workouts from this plan"
+        }
+        orderedIds.forEachIndexed { index, id ->
+            workoutPlanDao.setWorkoutTemplateOrder(id, index + 1)
         }
     }
 

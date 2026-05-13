@@ -52,9 +52,9 @@ class DatabaseSeederTest {
         )
         assertEquals(DefaultSeedData.plans.map { it.name }, plans.map { it.name })
 
-        val fullBodyPlan = plans.first { it.name == "Фулбоди для новичка" }
+        val fullBodyPlan = plans.first { it.name == "Фулбади для новичка" }
         val fullBodyTemplates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(fullBodyPlan.id)
-        assertEquals(listOf("Фулбоди A", "Фулбоди B"), fullBodyTemplates.map { it.name })
+        assertEquals(listOf("Фулбади A", "Фулбади B"), fullBodyTemplates.map { it.name })
         assertEquals(listOf(1, 2), fullBodyTemplates.map { it.order })
 
         val firstTemplateExercises = db.exerciseToDoDao()

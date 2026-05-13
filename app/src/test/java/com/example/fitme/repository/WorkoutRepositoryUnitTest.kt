@@ -91,7 +91,7 @@ class WorkoutRepositoryUnitTest {
             val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
             val id2 = repository.appendWorkoutTemplate("Бицепс спина", planId).toInt()
             val id3 = repository.appendWorkoutTemplate("Грудь трицепс", planId).toInt()
-            repository.reorderWorkoutTemplates(listOf(id3, id1, id2))
+            repository.reorderWorkoutTemplates(planId, listOf(id3, id1, id2))
             val plan: PlanWorkoutTemplates? = repository.getWorkoutTemplatesByPlanId(planId)
             assert(plan != null)
             assertEquals(plan!!.workoutTemplates.size,3)
@@ -100,12 +100,40 @@ class WorkoutRepositoryUnitTest {
         }
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun reorderWorkoutTemplatesRejectsDuplicateIds() = runBlocking {
+        val planId = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
+        val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
+        repository.appendWorkoutTemplate("Верх", planId)
+
+        repository.reorderWorkoutTemplates(planId, listOf(id1, id1))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun reorderWorkoutTemplatesRejectsIdsFromOtherPlan() = runBlocking {
+        val planId = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
+        val otherPlanId = db.workoutPlanDao().insertPlan(Plan(name = "Other plan")).toInt()
+        val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
+        val otherId = repository.appendWorkoutTemplate("Верх", otherPlanId).toInt()
+
+        repository.reorderWorkoutTemplates(planId, listOf(id1, otherId))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun reorderWorkoutTemplatesRejectsMissingIds() = runBlocking {
+        val planId = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
+        val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
+        repository.appendWorkoutTemplate("Верх", planId)
+
+        repository.reorderWorkoutTemplates(planId, listOf(id1))
+    }
+
     @Test
     fun removeWorkoutTemplateForPlanDeletesTemplateAndCompactsOrder() = runBlocking {
         val planId = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
         val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
         val id2 = repository.appendWorkoutTemplate("Верх", planId).toInt()
-        val id3 = repository.appendWorkoutTemplate("Фулбоди", planId).toInt()
+        val id3 = repository.appendWorkoutTemplate("Фулбади", planId).toInt()
         val secondTemplate = db.workoutPlanDao().getWorkoutTemplateById(id2)!!
 
         repository.removeWorkoutTemplateForPlan(secondTemplate)
