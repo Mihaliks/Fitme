@@ -5,6 +5,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.fitme.data.entities.Plan
 
 enum class WorkoutsSubScreen {
     MAIN, READY_MADE, BY_MUSCLE, CONSTRUCTOR
@@ -131,20 +135,107 @@ fun WorkoutCategoryCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
+    val viewModel: WorkoutsViewModel = viewModel()
+    val plans by viewModel.plans.collectAsState()
+    val templates by viewModel.selectedPlanTemplates.collectAsState()
+    var selectedPlan by remember { mutableStateOf<Plan?>(null) }
+
+    if (selectedPlan != null) {
+        BackHandler { selectedPlan = null }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("lvl 1: Готовые тренировки") },
+                title = { Text(selectedPlan?.name ?: "lvl 1: Готовые тренировки") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { 
+                        if (selectedPlan != null) {
+                            selectedPlan = null 
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 }
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-            Text("Экран готовых тренировок")
+        if (selectedPlan == null) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(plans) { plan ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedPlan = plan
+                                viewModel.loadTemplatesForPlan(plan.id)
+                            },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.ListAlt, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(16.dp))
+                            Text(plan.name, style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.weight(1f))
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        }
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(templates) { template ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${template.order}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Text(template.name, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+                
+                item {
+                    Button(
+                        onClick = { /* Логика выбора плана */ },
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Выбрать этот план")
+                    }
+                }
+            }
         }
     }
 }
