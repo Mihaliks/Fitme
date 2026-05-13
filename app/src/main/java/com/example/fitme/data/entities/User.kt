@@ -21,6 +21,7 @@ import androidx.room.PrimaryKey
 
 data class User(
     @PrimaryKey(autoGenerate = true) val id: Int,
+    @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "age") val age: Int,
     //only kg
     @ColumnInfo(name = "weight") val weight: Float,

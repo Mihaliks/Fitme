@@ -5,25 +5,47 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import java.time.LocalDate
+import com.example.fitme.data.entities.enums.TrainingMode
 
-//Записи дневника о силовых показателях в определенный день, по сути.
-@Entity(tableName = "notes",
+// Один сет, фактически выполненный пользователем.
+@Entity(
+    tableName = "notes",
     foreignKeys = [
+        ForeignKey(
+            entity = ExerciseToDo::class,
+            parentColumns = ["id"],
+            childColumns = ["exercise_to_do_id"],
+            onDelete = ForeignKey.SET_NULL
+        ),
         ForeignKey(
             entity = Exercise::class,
             parentColumns = ["id"],
             childColumns = ["exercise_id"],
+            onDelete = ForeignKey.NO_ACTION
+        ),
+        ForeignKey(
+            entity = WorkoutSession::class,
+            parentColumns = ["id"],
+            childColumns = ["workout_session_id"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("exercise_id")]
-
-    )
-data class Note (
-    @PrimaryKey(autoGenerate = true) val id: Int,
-    @ColumnInfo(name="date") val date: LocalDate,
-    @ColumnInfo(name="exercise_id") val exerciseId : Int,
-    @ColumnInfo(name="max1") val max1 : String?,
-    @ColumnInfo(name="max2") val max2 : String?
-    )
+    indices = [
+        Index("exercise_to_do_id"),
+        Index("exercise_id"),
+        Index("workout_session_id"),
+        Index(value = ["workout_session_id", "exercise_to_do_id"]),
+        Index(value = ["workout_session_id", "exercise_id"]),
+    ]
+)
+data class Note(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "exercise_to_do_id") val exerciseToDoId: Int?,
+    @ColumnInfo(name = "exercise_id") val exerciseId: Int,
+    @ColumnInfo(name = "workout_session_id") val workoutSessionId: Int,
+    @ColumnInfo(name = "set_index") val setIndex: Int,
+    @ColumnInfo(name = "mode_used") val modeUsed: TrainingMode,
+    val reps: Int? = null,
+    val weight: Double? = null,
+    val duration: Int? = null,
+)

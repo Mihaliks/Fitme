@@ -8,52 +8,85 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
-import com.example.fitme.data.entities.relations.PlanWithWorkouts
-import com.example.fitme.data.entities.relations.WorkoutWithExercises
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface WorkoutPlanDao {
+abstract class WorkoutPlanDao {
 
     @Insert
-    suspend fun insertPlan(plan: Plan): Long
+    abstract suspend fun insertPlan(plan: Plan): Long
+
+    @Query("SELECT COUNT(*) FROM plans")
+    abstract suspend fun getPlanCount(): Int
 
     @Update
-    suspend fun updatePlan(plan: Plan)
+    abstract suspend fun updatePlan(plan: Plan)
 
     @Delete
-    suspend fun deletePlan(plan: Plan)
+    abstract suspend fun deletePlan(plan: Plan)
 
     @Query("SELECT * FROM plans ORDER BY id")
-    fun getAllPlans(): Flow<List<Plan>>
+    abstract fun getAllPlans(): Flow<List<Plan>>
 
+    @Query("SELECT * FROM plans WHERE isActive = 1 ORDER BY id")
+    abstract fun getAllActivePlans(): Flow<List<Plan>>
+    @Query("SELECT * FROM plans WHERE isActive = 0 ORDER BY id")
+    abstract fun getAllInactivePlans(): Flow<List<Plan>>
     @Query("SELECT * FROM plans WHERE id = :planId")
-    suspend fun getPlanById(planId: Int): Plan?
-
-    @Transaction
-    @Query("SELECT * FROM plans ORDER BY id")
-    fun getAllPlansWithWorkouts(): Flow<List<PlanWithWorkouts>>
-
-    @Transaction
-    @Query("SELECT * FROM plans WHERE id = :planId")
-    suspend fun getPlanWithWorkouts(planId: Int): PlanWithWorkouts?
+    abstract suspend fun getPlanById(planId: Int): Plan?
 
     @Insert
-    suspend fun insertWorkoutTemplate(workoutTemplate: WorkoutTemplate): Long
+    abstract suspend fun insertWorkoutTemplate(workoutTemplate: WorkoutTemplate): Long
 
     @Update
-    suspend fun updateWorkoutTemplate(workoutTemplate: WorkoutTemplate)
+    abstract suspend fun updateWorkoutTemplate(workoutTemplate: WorkoutTemplate)
 
     @Delete
-    suspend fun deleteWorkoutTemplate(workoutTemplate: WorkoutTemplate)
+    abstract suspend fun deleteWorkoutTemplate(workoutTemplate: WorkoutTemplate)
 
     @Query("SELECT * FROM workout_templates WHERE id = :workoutTemplateId")
-    suspend fun getWorkoutTemplateById(workoutTemplateId: Int): WorkoutTemplate?
+    abstract suspend fun getWorkoutTemplateById(workoutTemplateId: Int): WorkoutTemplate?
 
-    @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY id")
-    fun getWorkoutTemplatesForPlan(planId: Int): Flow<List<WorkoutTemplate>>
+    @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
+    abstract fun getWorkoutTemplatesForPlan(planId: Int): Flow<List<WorkoutTemplate>>
 
+    @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
+    abstract suspend fun getWorkoutTemplatesForPlanOnce(planId: Int): List<WorkoutTemplate>
+
+    @Query("SELECT id FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
+    abstract suspend fun getWorkoutTemplateIdsForPlan(planId: Int): List<Int>
+
+    @Query("SELECT MAX(`order`) FROM workout_templates WHERE plan_id = :planId")
+    protected abstract suspend fun getMaxOrderForPlan(planId: Int): Int?
     @Transaction
-    @Query("SELECT * FROM workout_templates WHERE id = :workoutTemplateId")
-    suspend fun getWorkoutWithExercises(workoutTemplateId: Int): WorkoutWithExercises?
+    open suspend fun appendWorkoutTemplate(name: String, planId: Int): Long {
+        val nextOrder = (getMaxOrderForPlan(planId) ?: 0) + 1
+        return insertWorkoutTemplate(
+            WorkoutTemplate(name = name, planId = planId, order = nextOrder)
+        )
+    }
+
+    @Query("UPDATE workout_templates SET `order` = :newOrder WHERE id = :id")
+    abstract suspend fun setWorkoutTemplateOrder(id: Int, newOrder: Int)
+
+    @Query(
+        """
+        SELECT * FROM workout_templates
+        WHERE plan_id = :planId AND `order` > :afterOrder
+        ORDER BY `order` ASC
+        LIMIT 1
+        """
+    )
+    abstract suspend fun getNextWorkoutTemplateAfter(planId: Int, afterOrder: Int): WorkoutTemplate?
+
+    @Query(
+        """
+        SELECT * FROM workout_templates
+        WHERE plan_id = :planId
+        ORDER BY `order` ASC
+        LIMIT 1
+        """
+    )
+    abstract suspend fun getFirstWorkoutTemplate(planId: Int): WorkoutTemplate?
+
 }
