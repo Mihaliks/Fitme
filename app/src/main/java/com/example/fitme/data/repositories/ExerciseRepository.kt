@@ -31,13 +31,14 @@ class ExerciseRepository(private val exerciseDao: ExerciseDao) {
     }
 
     suspend fun createCustomExercise(exercise: Exercise): Long {
+        val normalizedName = validateExerciseName(exercise.name)
         return exerciseDao.insertExercise(
-            exercise.copy(id = 0, isActive = true, isBuiltIn = false)
+            exercise.copy(id = 0, name = normalizedName, isActive = true, isBuiltIn = false)
         )
     }
     // через это менять статус активности
     suspend fun updateCustomExercise(exercise: Exercise) {
-        exerciseDao.updateExercise(exercise)
+        exerciseDao.updateExercise(exercise.copy(name = validateExerciseName(exercise.name)))
     }
 
     suspend fun archiveCustomExercise(exercise: Exercise) {
@@ -46,4 +47,10 @@ class ExerciseRepository(private val exerciseDao: ExerciseDao) {
 
     suspend fun getExerciseById(exerciseId: Int): Exercise? =
         exerciseDao.getExerciseById(exerciseId)
+
+    private fun validateExerciseName(name: String): String {
+        val normalized = name.trim()
+        require(normalized.isNotBlank()) { "Exercise name must not be blank" }
+        return normalized
+    }
 }

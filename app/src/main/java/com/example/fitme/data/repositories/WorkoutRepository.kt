@@ -29,13 +29,17 @@ class WorkoutRepository(private val db: AppDatabase) {
         )
     }
 
-    suspend fun createNewPlan(name: String): Long = workoutPlanDao.insertPlan(Plan(name = name))
+    suspend fun createNewPlan(name: String): Long =
+        workoutPlanDao.insertPlan(Plan(name = validateName(name, "Plan name")))
+
     fun getActivePlans() = workoutPlanDao.getAllActivePlans()
     fun getInactivePlans() = workoutPlanDao.getAllInactivePlans()
     fun getAllPlans() = workoutPlanDao.getAllPlans()
     suspend fun archivePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = false))
     suspend fun restorePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = true))
-    suspend fun updatePlan(plan: Plan) = workoutPlanDao.updatePlan(plan)
+    suspend fun updatePlan(plan: Plan) =
+        workoutPlanDao.updatePlan(plan.copy(name = validateName(plan.name, "Plan name")))
+
     suspend fun removeWorkoutTemplateForPlan(workoutTemplate: WorkoutTemplate) = db.withTransaction {
         workoutPlanDao.deleteWorkoutTemplate(workoutTemplate)
         val remainingIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(workoutTemplate.planId)
@@ -46,7 +50,7 @@ class WorkoutRepository(private val db: AppDatabase) {
 
     //добавить тренировку в конец плана
     suspend fun appendWorkoutTemplate(name: String, planId: Int): Long =
-        workoutPlanDao.appendWorkoutTemplate(name, planId)
+        workoutPlanDao.appendWorkoutTemplate(validateName(name, "Workout template name"), planId)
 
     //поменять список тренировок в новом порядке
     suspend fun reorderWorkoutTemplates(
@@ -66,6 +70,7 @@ class WorkoutRepository(private val db: AppDatabase) {
     }
 
     suspend fun appendExerciseToWorkoutTemplate(exerciseToDo: ExerciseToDo): Long = db.withTransaction {
+        validateExerciseToDo(exerciseToDo)
         val nextOrder = (exerciseToDoDao.getMaxOrderForWorkoutTemplate(
             exerciseToDo.workoutTemplateId
         ) ?: 0) + 1
@@ -75,6 +80,7 @@ class WorkoutRepository(private val db: AppDatabase) {
     }
 
     suspend fun updateExerciseInWorkoutTemplate(exerciseToDo: ExerciseToDo) {
+        validateExerciseToDo(exerciseToDo)
         exerciseToDoDao.updateExerciseToDo(exerciseToDo)
     }
 
@@ -193,4 +199,57 @@ class WorkoutRepository(private val db: AppDatabase) {
 
     // сущность для выкидывания во фронтенд
     private data class PlannedParams(val sets: Int, val reps: Int, val weight: Double?)
+
+    private fun validateName(name: String, fieldName: String): String {
+        val normalized = name.trim()
+        require(normalized.isNotBlank()) { "$fieldName must not be blank" }
+        return normalized
+    }
+
+    private fun validateExerciseToDo(exerciseToDo: ExerciseToDo) {
+        require(exerciseToDo.sets > 0) { "Exercise sets must be greater than zero" }
+        require(exerciseToDo.reps > 0) { "Exercise reps must be greater than zero" }
+        validateNonNegative(exerciseToDo.weight, "Exercise weight")
+        validateNonNegative(exerciseToDo.duration, "Exercise duration")
+        validateCustomModeName(
+            customTrainingModeName = exerciseToDo.customTrainingModeName,
+            modes = listOf(exerciseToDo.trainingMode, exerciseToDo.modeA, exerciseToDo.modeB),
+        )
+        if (exerciseToDo.periodizationEnabled) {
+            val modeA = exerciseToDo.modeA
+            val modeB = exerciseToDo.modeB
+            require(modeA != null) { "Periodization modeA must be set" }
+            require(modeB != null) { "Periodization modeB must be set" }
+            require(modeA != modeB) { "Periodization modes must be different" }
+            validatePositive(exerciseToDo.setsA, "Periodization setsA")
+            validatePositive(exerciseToDo.repsA, "Periodization repsA")
+            validateNonNegative(exerciseToDo.weightA, "Periodization weightA")
+            validatePositive(exerciseToDo.setsB, "Periodization setsB")
+            validatePositive(exerciseToDo.repsB, "Periodization repsB")
+            validateNonNegative(exerciseToDo.weightB, "Periodization weightB")
+        }
+    }
+
+    private fun validateCustomModeName(
+        customTrainingModeName: String?,
+        modes: List<TrainingMode?>,
+    ) {
+        if (modes.any { it == TrainingMode.CUSTOM }) {
+            require(!customTrainingModeName.isNullOrBlank()) {
+                "Custom training mode name must not be blank"
+            }
+        }
+    }
+
+    private fun validatePositive(value: Int?, fieldName: String) {
+        require(value == null || value > 0) { "$fieldName must be greater than zero" }
+    }
+
+    private fun validateNonNegative(value: Int?, fieldName: String) {
+        require(value == null || value >= 0) { "$fieldName must not be negative" }
+    }
+
+    private fun validateNonNegative(value: Double?, fieldName: String) {
+        require(value == null || value >= 0.0) { "$fieldName must not be negative" }
+    }
 }

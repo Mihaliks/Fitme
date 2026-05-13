@@ -84,6 +84,38 @@ class WorkoutRepositoryUnitTest {
         }
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun createNewPlanRejectsBlankName() {
+        runBlocking {
+            repository.createNewPlan("   ")
+        }
+    }
+
+    @Test
+    fun createNewPlanTrimsName() = runBlocking {
+        val planId = repository.createNewPlan("  My plan  ").toInt()
+
+        val plan = db.workoutPlanDao().getPlanById(planId)
+        assertEquals("My plan", plan!!.name)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun updatePlanRejectsBlankName() = runBlocking {
+        val planId = repository.createNewPlan("My plan").toInt()
+        val plan = db.workoutPlanDao().getPlanById(planId)!!
+
+        repository.updatePlan(plan.copy(name = " "))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendWorkoutTemplateRejectsBlankName() {
+        runBlocking {
+            val planId = repository.createNewPlan("My plan").toInt()
+
+            repository.appendWorkoutTemplate(" ", planId)
+        }
+    }
+
     @Test
     fun reorderWorkoutTemplates() {
         runBlocking {
@@ -159,6 +191,70 @@ class WorkoutRepositoryUnitTest {
         val exercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(templateId)
         assertEquals(listOf(firstId, secondId), exercises.map { it.exerciseToDo.id })
         assertEquals(listOf(1, 2), exercises.map { it.exerciseToDo.order })
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendExerciseToWorkoutTemplateRejectsInvalidSets() {
+        runBlocking {
+            val templateId = newTemplate()
+            val exerciseId = newExercise("Жим")
+
+            repository.appendExerciseToWorkoutTemplate(
+                exerciseToDo(templateId, exerciseId, sets = 0)
+            )
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendExerciseToWorkoutTemplateRejectsInvalidReps() {
+        runBlocking {
+            val templateId = newTemplate()
+            val exerciseId = newExercise("Жим")
+
+            repository.appendExerciseToWorkoutTemplate(
+                exerciseToDo(templateId, exerciseId, reps = 0)
+            )
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendExerciseToWorkoutTemplateRejectsNegativeWeight() {
+        runBlocking {
+            val templateId = newTemplate()
+            val exerciseId = newExercise("Жим")
+
+            repository.appendExerciseToWorkoutTemplate(
+                exerciseToDo(templateId, exerciseId, weight = -1.0)
+            )
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendExerciseToWorkoutTemplateRejectsInvalidPeriodization() {
+        runBlocking {
+            val templateId = newTemplate()
+            val exerciseId = newExercise("Жим")
+
+            repository.appendExerciseToWorkoutTemplate(
+                exerciseToDo(templateId, exerciseId).copy(
+                    periodizationEnabled = true,
+                    modeA = TrainingMode.STRENGTH,
+                    modeB = TrainingMode.STRENGTH,
+                )
+            )
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendExerciseToWorkoutTemplateRejectsCustomModeWithoutName() {
+        runBlocking {
+            val templateId = newTemplate()
+            val exerciseId = newExercise("Жим")
+
+            repository.appendExerciseToWorkoutTemplate(
+                exerciseToDo(templateId, exerciseId).copy(trainingMode = TrainingMode.CUSTOM)
+            )
+        }
     }
 
     @Test

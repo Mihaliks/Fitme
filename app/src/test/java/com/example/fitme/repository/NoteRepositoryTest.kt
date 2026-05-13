@@ -110,6 +110,33 @@ class NoteRepositoryTest {
         assertEquals(listOf(1, 2, 3), notes.map { it.setIndex })
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun appendNoteRejectsInvalidReps() {
+        runBlocking {
+            val fx = fixture()
+
+            repository.appendNote(fx.sessionId, fx.todoId, TrainingMode.HYPERTROPHY, reps = 0)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendNoteRejectsNegativeWeight() {
+        runBlocking {
+            val fx = fixture()
+
+            repository.appendNote(fx.sessionId, fx.todoId, TrainingMode.HYPERTROPHY, weight = -1.0)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appendNoteRejectsNegativeDuration() {
+        runBlocking {
+            val fx = fixture()
+
+            repository.appendNote(fx.sessionId, fx.todoId, TrainingMode.HYPERTROPHY, duration = -1)
+        }
+    }
+
     @Test
     fun appendNoteSetIndexIsScopedToSessionAndExercise() = runBlocking {
         val fx = fixture()

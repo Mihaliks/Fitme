@@ -21,7 +21,7 @@ interface WorkoutSessionDao {
     @Delete
     suspend fun deleteWorkoutSession(workoutSession: WorkoutSession)
 
-    @Query("SELECT * FROM workout_sessions ORDER BY date DESC")
+    @Query("SELECT * FROM workout_sessions ORDER BY date DESC, id DESC")
     fun getAllWorkoutSessions(): PagingSource<Int, WorkoutSession>
 
     @Query("SELECT * FROM workout_sessions WHERE workout_template_id = :workoutTemplateId ORDER BY date DESC")

@@ -53,6 +53,7 @@ class NoteRepository(private val db: AppDatabase) {
         weight: Double? = null,
         duration: Int? = null,
     ): Long = db.withTransaction {
+        validateNoteInput(reps = reps, weight = weight, duration = duration)
         val session = workoutSessionDao.getWorkoutSessionById(workoutSessionId)
             ?: error("Workout session not found")
         val exerciseToDo = exerciseToDoDao.getExerciseToDoById(exerciseToDoId)
@@ -73,5 +74,15 @@ class NoteRepository(private val db: AppDatabase) {
                 duration = duration,
             )
         )
+    }
+
+    private fun validateNoteInput(
+        reps: Int?,
+        weight: Double?,
+        duration: Int?,
+    ) {
+        require(reps == null || reps > 0) { "Note reps must be greater than zero" }
+        require(weight == null || weight >= 0.0) { "Note weight must not be negative" }
+        require(duration == null || duration >= 0) { "Note duration must not be negative" }
     }
 }

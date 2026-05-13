@@ -59,6 +59,21 @@ class ExerciseRepositoryTest {
         assertTrue(saved.isActive)
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun createCustomExerciseRejectsBlankName() {
+        runBlocking {
+            repository.createCustomExercise(exercise(name = "   "))
+        }
+    }
+
+    @Test
+    fun createCustomExerciseTrimsName() = runBlocking {
+        val id = repository.createCustomExercise(exercise(name = "  Bench Press  ")).toInt()
+
+        val saved = repository.getExerciseById(id)
+        assertEquals("Bench Press", saved!!.name)
+    }
+
     @Test
     fun getAllActiveExercisesReturnsOnlyActiveExercises() = runBlocking {
         insertExercise(name = "Bench Press", isActive = true)
@@ -157,6 +172,14 @@ class ExerciseRepositoryTest {
         val updated = repository.getExerciseById(id)
         assertEquals("Barbell Bench Press", updated!!.name)
         assertEquals(MuscleGroup.UPPER_CHEST, updated.muscle)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun updateCustomExerciseRejectsBlankName() = runBlocking {
+        val id = repository.createCustomExercise(exercise(name = "Bench Press")).toInt()
+        val saved = repository.getExerciseById(id)!!
+
+        repository.updateCustomExercise(saved.copy(name = " "))
     }
 
     @Test
