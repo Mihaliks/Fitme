@@ -50,6 +50,9 @@ abstract class WorkoutPlanDao {
     @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
     abstract suspend fun getWorkoutTemplatesForPlanOnce(planId: Int): List<WorkoutTemplate>
 
+    @Query("SELECT id FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
+    abstract suspend fun getWorkoutTemplateIdsForPlan(planId: Int): List<Int>
+
     @Query("SELECT MAX(`order`) FROM workout_templates WHERE plan_id = :planId")
     protected abstract suspend fun getMaxOrderForPlan(planId: Int): Int?
     @Transaction

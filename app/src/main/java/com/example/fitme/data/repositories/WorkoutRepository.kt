@@ -20,15 +20,6 @@ class WorkoutRepository(private val db: AppDatabase) {
     private val exerciseToDoDao = db.exerciseToDoDao()
     private val noteRepository = NoteRepository(db)
 
-
-    //TODO fun получить список активных планов, список неактивных планов, список всех планов
-    //TODO fun удалить план (каскадно вместе с WorkoutTemplate и ExerciseToDo)
-    //TODO fun обновить план
-    //TODO fun удалить тренировку из плана (каскадно вместе с ExerciseToDo)
-    //TODO fun создать упражнениe, reorder упражений в тренировке плана (подобно appendWorkoutTemplate, reorderWorkoutTemplates)
-    //TODO fun изменить, удалить упражнение в тренировке плана
-
-
     //прочитать список тренировок по id плана
     suspend fun getWorkoutTemplatesByPlanId(planId: Int): PlanWorkoutTemplates? {
         val plan = workoutPlanDao.getPlanById(planId) ?: return null
@@ -38,8 +29,21 @@ class WorkoutRepository(private val db: AppDatabase) {
         )
     }
 
-    //создать новый план
-    suspend fun createNewPlan(name: String): Long = workoutPlanDao.insertPlan(Plan(name=name))
+    suspend fun createNewPlan(name: String): Long = workoutPlanDao.insertPlan(Plan(name = name))
+    fun getActivePlans() = workoutPlanDao.getAllActivePlans()
+    fun getInactivePlans() = workoutPlanDao.getAllInactivePlans()
+    fun getAllPlans() = workoutPlanDao.getAllPlans()
+    suspend fun archivePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = false))
+    suspend fun restorePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = true))
+    suspend fun updatePlan(plan: Plan) = workoutPlanDao.updatePlan(plan)
+    suspend fun removeWorkoutTemplateForPlan(workoutTemplate: WorkoutTemplate) = db.withTransaction {
+        workoutPlanDao.deleteWorkoutTemplate(workoutTemplate)
+        val remainingIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(workoutTemplate.planId)
+        remainingIds.forEachIndexed { index, id ->
+            workoutPlanDao.setWorkoutTemplateOrder(id, index + 1)
+        }
+    }
+
     //добавить тренировку в конец плана
     suspend fun appendWorkoutTemplate(name: String, planId: Int): Long =
         workoutPlanDao.appendWorkoutTemplate(name, planId)
@@ -50,6 +54,45 @@ class WorkoutRepository(private val db: AppDatabase) {
             orderedIds.forEachIndexed { index, id ->
                 workoutPlanDao.setWorkoutTemplateOrder(id, index + 1)
             }
+        }
+    }
+
+    suspend fun appendExerciseToWorkoutTemplate(exerciseToDo: ExerciseToDo): Long = db.withTransaction {
+        val nextOrder = (exerciseToDoDao.getMaxOrderForWorkoutTemplate(
+            exerciseToDo.workoutTemplateId
+        ) ?: 0) + 1
+        exerciseToDoDao.insertExerciseToDo(
+            exerciseToDo.copy(id = 0, order = nextOrder)
+        )
+    }
+
+    suspend fun updateExerciseInWorkoutTemplate(exerciseToDo: ExerciseToDo) {
+        exerciseToDoDao.updateExerciseToDo(exerciseToDo)
+    }
+
+    suspend fun removeExerciseFromWorkoutTemplate(exerciseToDo: ExerciseToDo) = db.withTransaction {
+        exerciseToDoDao.deleteExerciseToDo(exerciseToDo)
+        val remainingIds = exerciseToDoDao.getExerciseToDoIdsForWorkoutTemplate(
+            exerciseToDo.workoutTemplateId
+        )
+        remainingIds.forEachIndexed { index, id ->
+            exerciseToDoDao.setExerciseToDoOrder(id, index + 1)
+        }
+    }
+
+    suspend fun reorderExercisesInWorkoutTemplate(
+        workoutTemplateId: Int,
+        orderedIds: List<Int>,
+    ) = db.withTransaction {
+        val currentIds = exerciseToDoDao.getExerciseToDoIdsForWorkoutTemplate(workoutTemplateId)
+        require(orderedIds.size == orderedIds.toSet().size) {
+            "Exercise order contains duplicate ids"
+        }
+        require(orderedIds.toSet() == currentIds.toSet()) {
+            "Exercise order must contain all and only exercises from this workout template"
+        }
+        orderedIds.forEachIndexed { index, id ->
+            exerciseToDoDao.setExerciseToDoOrder(id, index + 1)
         }
     }
 
@@ -115,6 +158,7 @@ class WorkoutRepository(private val db: AppDatabase) {
             else -> a
         }
     }
+
     //выбирает какие ожидания от пользователя в этом упражнении
     private fun pickPlannedParams(etd: ExerciseToDo, mode: TrainingMode): PlannedParams {
         if (!etd.periodizationEnabled) {
@@ -126,11 +170,13 @@ class WorkoutRepository(private val db: AppDatabase) {
                 reps = etd.repsA ?: etd.reps,
                 weight = etd.weightA ?: etd.weight,
             )
+
             etd.modeB -> PlannedParams(
                 sets = etd.setsB ?: etd.sets,
                 reps = etd.repsB ?: etd.reps,
                 weight = etd.weightB ?: etd.weight,
             )
+
             else -> PlannedParams(etd.sets, etd.reps, etd.weight)
         }
     }

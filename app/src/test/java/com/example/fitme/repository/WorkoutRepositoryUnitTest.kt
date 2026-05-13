@@ -6,8 +6,12 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.fitme.data.AppDatabase
+import com.example.fitme.data.entities.Exercise
+import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
+import com.example.fitme.data.entities.enums.BodyRegion
+import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.models.PlanWorkoutTemplates
 import com.example.fitme.data.repositories.WorkoutRepository
 import org.junit.Assert.assertEquals
@@ -95,4 +99,152 @@ class WorkoutRepositoryUnitTest {
             assertEquals(listOf(1, 2, 3), plan.workoutTemplates.map { it.order })
         }
     }
+
+    @Test
+    fun removeWorkoutTemplateForPlanDeletesTemplateAndCompactsOrder() = runBlocking {
+        val planId = db.workoutPlanDao().insertPlan(Plan(name = "My first plan")).toInt()
+        val id1 = repository.appendWorkoutTemplate("Ноги", planId).toInt()
+        val id2 = repository.appendWorkoutTemplate("Верх", planId).toInt()
+        val id3 = repository.appendWorkoutTemplate("Фулбоди", planId).toInt()
+        val secondTemplate = db.workoutPlanDao().getWorkoutTemplateById(id2)!!
+
+        repository.removeWorkoutTemplateForPlan(secondTemplate)
+
+        val plan = repository.getWorkoutTemplatesByPlanId(planId)!!
+        assertEquals(listOf(id1, id3), plan.workoutTemplates.map { it.id })
+        assertEquals(listOf(1, 2), plan.workoutTemplates.map { it.order })
+    }
+
+    @Test
+    fun appendExerciseToWorkoutTemplateAddsExerciseAtEnd() = runBlocking {
+        val templateId = newTemplate()
+        val benchId = newExercise("Жим")
+        val rowId = newExercise("Тяга")
+
+        val firstId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, benchId, order = 99)
+        ).toInt()
+        val secondId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, rowId, order = 99)
+        ).toInt()
+
+        val exercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(templateId)
+        assertEquals(listOf(firstId, secondId), exercises.map { it.exerciseToDo.id })
+        assertEquals(listOf(1, 2), exercises.map { it.exerciseToDo.order })
+    }
+
+    @Test
+    fun updateExerciseInWorkoutTemplatePersistsChanges() = runBlocking {
+        val templateId = newTemplate()
+        val exerciseId = newExercise("Жим")
+        val todoId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, exerciseId, sets = 3, reps = 8, weight = 50.0)
+        ).toInt()
+        val saved = db.exerciseToDoDao().getExerciseToDoById(todoId)!!
+
+        repository.updateExerciseInWorkoutTemplate(
+            saved.copy(sets = 5, reps = 5, weight = 100.0, trainingMode = TrainingMode.STRENGTH)
+        )
+
+        val updated = db.exerciseToDoDao().getExerciseToDoById(todoId)!!
+        assertEquals(5, updated.sets)
+        assertEquals(5, updated.reps)
+        assertEquals(100.0, updated.weight!!, 0.0001)
+        assertEquals(TrainingMode.STRENGTH, updated.trainingMode)
+    }
+
+    @Test
+    fun removeExerciseFromWorkoutTemplateDeletesExerciseAndCompactsOrder() = runBlocking {
+        val templateId = newTemplate()
+        val firstId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Жим"))
+        ).toInt()
+        val secondId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Тяга"))
+        ).toInt()
+        val thirdId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Присед"))
+        ).toInt()
+        val second = db.exerciseToDoDao().getExerciseToDoById(secondId)!!
+
+        repository.removeExerciseFromWorkoutTemplate(second)
+
+        val exercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(templateId)
+        assertEquals(listOf(firstId, thirdId), exercises.map { it.exerciseToDo.id })
+        assertEquals(listOf(1, 2), exercises.map { it.exerciseToDo.order })
+    }
+
+    @Test
+    fun reorderExercisesInWorkoutTemplateReordersOnlyCompleteTemplateList() = runBlocking {
+        val templateId = newTemplate()
+        val id1 = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Жим"))
+        ).toInt()
+        val id2 = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Тяга"))
+        ).toInt()
+        val id3 = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Присед"))
+        ).toInt()
+
+        repository.reorderExercisesInWorkoutTemplate(templateId, listOf(id3, id1, id2))
+
+        val exercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(templateId)
+        assertEquals(listOf(id3, id1, id2), exercises.map { it.exerciseToDo.id })
+        assertEquals(listOf(1, 2, 3), exercises.map { it.exerciseToDo.order })
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun reorderExercisesInWorkoutTemplateRejectsDuplicateIds() = runBlocking {
+        val templateId = newTemplate()
+        val id1 = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Жим"))
+        ).toInt()
+        repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Тяга"))
+        )
+
+        repository.reorderExercisesInWorkoutTemplate(templateId, listOf(id1, id1))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun reorderExercisesInWorkoutTemplateRejectsIdsFromOtherTemplate() = runBlocking {
+        val templateId = newTemplate()
+        val otherTemplateId = newTemplate(name = "Other")
+        val id1 = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(templateId, newExercise("Жим"))
+        ).toInt()
+        val otherId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(otherTemplateId, newExercise("Тяга"))
+        ).toInt()
+
+        repository.reorderExercisesInWorkoutTemplate(templateId, listOf(id1, otherId))
+    }
+
+    private suspend fun newTemplate(name: String = "A"): Int {
+        val planId = db.workoutPlanDao().insertPlan(Plan(name = "Plan $name")).toInt()
+        return repository.appendWorkoutTemplate(name, planId).toInt()
+    }
+
+    private suspend fun newExercise(name: String): Int =
+        db.exerciseDao().insertExercise(
+            Exercise(name = name, bodyRegion = BodyRegion.CHEST)
+        ).toInt()
+
+    private fun exerciseToDo(
+        templateId: Int,
+        exerciseId: Int,
+        order: Int = 1,
+        sets: Int = 3,
+        reps: Int = 8,
+        weight: Double? = 50.0,
+    ): ExerciseToDo = ExerciseToDo(
+        exerciseId = exerciseId,
+        workoutTemplateId = templateId,
+        sets = sets,
+        reps = reps,
+        weight = weight,
+        order = order,
+        trainingMode = TrainingMode.HYPERTROPHY,
+    )
 }

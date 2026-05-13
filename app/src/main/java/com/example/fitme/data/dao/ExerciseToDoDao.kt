@@ -8,7 +8,6 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ExerciseToDoDao {
@@ -25,14 +24,15 @@ interface ExerciseToDoDao {
     @Query("SELECT * FROM exercises_todo WHERE id = :exerciseToDoId")
     suspend fun getExerciseToDoById(exerciseToDoId: Int): ExerciseToDo?
 
-    /*
-    @Query("SELECT * FROM exercises_todo WHERE workout_template_id = :workoutTemplateId ORDER BY `order`")
-    fun getExercisesToDoForWorkout(workoutTemplateId: Int): Flow<List<ExerciseToDo>>
+    @Query("SELECT MAX(`order`) FROM exercises_todo WHERE workout_template_id = :workoutTemplateId")
+    suspend fun getMaxOrderForWorkoutTemplate(workoutTemplateId: Int): Int?
 
-    @Transaction
-    @Query("SELECT * FROM exercises_todo WHERE workout_template_id = :workoutTemplateId ORDER BY `order`")
-    fun getExerciseDetailsForWorkout(workoutTemplateId: Int): Flow<List<ExerciseWithDetails>>
-*/
+    @Query("SELECT id FROM exercises_todo WHERE workout_template_id = :workoutTemplateId ORDER BY `order`")
+    suspend fun getExerciseToDoIdsForWorkoutTemplate(workoutTemplateId: Int): List<Int>
+
+    @Query("UPDATE exercises_todo SET `order` = :newOrder WHERE id = :id")
+    suspend fun setExerciseToDoOrder(id: Int, newOrder: Int)
+
     @Transaction
     @Query("""
       SELECT * FROM exercises_todo

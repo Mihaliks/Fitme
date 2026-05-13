@@ -25,7 +25,6 @@ import com.example.fitme.data.entities.enums.TrainingMode
     ],
     indices = [Index("workout_template_id"), Index("exercise_id")]
 )
-//TODO реализовать режим суперсета (тут скорее визуальное изменение, нужно показывать не конкретное упражнение, а сразу группу
 data class ExerciseToDo(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo(name = "exercise_id") val exerciseId: Int,
