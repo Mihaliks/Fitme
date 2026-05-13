@@ -15,7 +15,13 @@ import com.example.fitme.data.entities.enums.TrainingMode
             entity = ExerciseToDo::class,
             parentColumns = ["id"],
             childColumns = ["exercise_to_do_id"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = Exercise::class,
+            parentColumns = ["id"],
+            childColumns = ["exercise_id"],
+            onDelete = ForeignKey.NO_ACTION
         ),
         ForeignKey(
             entity = WorkoutSession::class,
@@ -26,13 +32,16 @@ import com.example.fitme.data.entities.enums.TrainingMode
     ],
     indices = [
         Index("exercise_to_do_id"),
+        Index("exercise_id"),
         Index("workout_session_id"),
-        Index(value = ["workout_session_id", "exercise_to_do_id"])
+        Index(value = ["workout_session_id", "exercise_to_do_id"]),
+        Index(value = ["workout_session_id", "exercise_id"]),
     ]
 )
 data class Note(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "exercise_to_do_id") val exerciseToDoId: Int,
+    @ColumnInfo(name = "exercise_to_do_id") val exerciseToDoId: Int?,
+    @ColumnInfo(name = "exercise_id") val exerciseId: Int,
     @ColumnInfo(name = "workout_session_id") val workoutSessionId: Int,
     @ColumnInfo(name = "set_index") val setIndex: Int,
     @ColumnInfo(name = "mode_used") val modeUsed: TrainingMode,

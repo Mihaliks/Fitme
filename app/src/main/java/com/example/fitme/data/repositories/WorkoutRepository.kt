@@ -148,7 +148,9 @@ class WorkoutRepository(private val db: AppDatabase) {
     private suspend fun pickNextTemplate(planId: Int): WorkoutTemplate? {
         val lastSession = workoutSessionDao.getLastSessionForPlan(planId)
             ?: return workoutPlanDao.getFirstWorkoutTemplate(planId)
-        val lastTemplate = workoutPlanDao.getWorkoutTemplateById(lastSession.workoutTemplateId)
+        val lastTemplateId = lastSession.workoutTemplateId
+            ?: return workoutPlanDao.getFirstWorkoutTemplate(planId)
+        val lastTemplate = workoutPlanDao.getWorkoutTemplateById(lastTemplateId)
             ?: return workoutPlanDao.getFirstWorkoutTemplate(planId)
         return workoutPlanDao.getNextWorkoutTemplateAfter(planId, lastTemplate.order)
             ?: workoutPlanDao.getFirstWorkoutTemplate(planId)

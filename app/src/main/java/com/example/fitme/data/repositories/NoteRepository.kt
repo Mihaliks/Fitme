@@ -64,6 +64,7 @@ class NoteRepository(private val db: AppDatabase) {
         noteDao.insertNote(
             Note(
                 exerciseToDoId = exerciseToDoId,
+                exerciseId = exerciseToDo.exerciseId,
                 workoutSessionId = workoutSessionId,
                 setIndex = nextIndex,
                 modeUsed = modeUsed,

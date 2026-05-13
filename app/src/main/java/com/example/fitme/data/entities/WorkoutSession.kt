@@ -14,14 +14,14 @@ import java.time.LocalDate
             entity = WorkoutTemplate::class,
             parentColumns = ["id"],
             childColumns = ["workout_template_id"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [Index("workout_template_id")]
 )
 data class WorkoutSession(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "workout_template_id") val workoutTemplateId: Int,
+    @ColumnInfo(name = "workout_template_id") val workoutTemplateId: Int?,
     val date: LocalDate,
     @ColumnInfo(name = "total_duration") val totalDuration: Int? = null
 )

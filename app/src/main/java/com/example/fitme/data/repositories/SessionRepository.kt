@@ -35,7 +35,8 @@ class SessionRepository(private val db: AppDatabase) {
     suspend fun getWorkoutSessionHistory(workoutSessionId: Int): WorkoutSessionHistory? {
         val session = workoutSessionDao.getWorkoutSessionById(workoutSessionId)
             ?: return null
-        val template = workoutPlanDao.getWorkoutTemplateById(session.workoutTemplateId)
+        val workoutTemplateId = session.workoutTemplateId ?: return null
+        val template = workoutPlanDao.getWorkoutTemplateById(workoutTemplateId)
             ?: return null
         val exercises = exerciseToDoDao.getExerciseDetailsForWorkoutOnce(template.id)
             .map { details ->
