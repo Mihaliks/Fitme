@@ -23,11 +23,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
+import androidx.lifecycle.lifecycleScope
+import com.example.fitme.data.AppDatabase
+import com.example.fitme.data.seed.DatabaseSeeder
 import com.example.fitme.ui.theme.FitmeTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch(Dispatchers.IO) {
+            DatabaseSeeder(AppDatabase.getInstance(applicationContext)).seedIfNeeded()
+        }
         enableEdgeToEdge()
         setContent {
             FitmeTheme {

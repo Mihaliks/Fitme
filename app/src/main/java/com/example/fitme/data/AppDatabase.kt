@@ -21,7 +21,6 @@ import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.converters.Converter
 
 
-// TODO : Инициализация базы — заполнение данными по умолчанию при создании. Причем такие данные сделать неизменяемыми.
 // TODO : Миграции — после первых тестов.
 // TODO: Аккуратно реализовать каскадное удаление упражнения, чтобы не удалять план
 // На уровне идей для расширения:
@@ -38,7 +37,7 @@ import com.example.fitme.data.entities.converters.Converter
         WorkoutSession::class,
         WorkoutTemplate::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converter::class)

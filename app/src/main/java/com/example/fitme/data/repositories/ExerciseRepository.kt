@@ -32,7 +32,7 @@ class ExerciseRepository(private val exerciseDao: ExerciseDao) {
 
     suspend fun createCustomExercise(exercise: Exercise): Long {
         return exerciseDao.insertExercise(
-            exercise.copy(id = 0, isActive = true)
+            exercise.copy(id = 0, isActive = true, isBuiltIn = false)
         )
     }
     // через это менять статус активности

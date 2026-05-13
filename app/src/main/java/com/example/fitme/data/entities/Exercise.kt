@@ -15,5 +15,6 @@ data class Exercise(
     @ColumnInfo(name = "node_2") val node2: Int? = null,
     @ColumnInfo(name = "body_region") val bodyRegion: BodyRegion,
     @ColumnInfo(name = "is_active") val isActive: Boolean = true,
-    @ColumnInfo(name = "muscle") val muscle: MuscleGroup? = null
+    @ColumnInfo(name = "muscle") val muscle: MuscleGroup? = null,
+    @ColumnInfo(name = "is_builtin") val isBuiltIn: Boolean = false,
 )

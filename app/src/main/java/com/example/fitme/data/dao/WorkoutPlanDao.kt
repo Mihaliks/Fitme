@@ -16,6 +16,9 @@ abstract class WorkoutPlanDao {
     @Insert
     abstract suspend fun insertPlan(plan: Plan): Long
 
+    @Query("SELECT COUNT(*) FROM plans")
+    abstract suspend fun getPlanCount(): Int
+
     @Update
     abstract suspend fun updatePlan(plan: Plan)
 
