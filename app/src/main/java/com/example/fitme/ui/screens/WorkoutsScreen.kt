@@ -323,9 +323,10 @@ fun TemplateCard(name: String, exercises: List<com.example.fitme.data.entities.r
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
+                    val duration = detail.exerciseToDo.duration
                     Text(
-                        text = if (detail.exerciseToDo.duration != null && detail.exerciseToDo.duration!! > 0) {
-                            "${detail.exerciseToDo.sets} x ${detail.exerciseToDo.duration} сек"
+                        text = if (duration != null && duration > 0) {
+                            "${detail.exerciseToDo.sets} x $duration сек"
                         } else {
                             "${detail.exerciseToDo.sets} x ${detail.exerciseToDo.reps}"
                         },
@@ -344,7 +345,7 @@ fun TemplateCard(name: String, exercises: List<com.example.fitme.data.entities.r
 fun WorkoutsByMuscleScreen(onBack: () -> Unit) {
     val viewModel: WorkoutsViewModel = viewModel()
     val selectedRegion by viewModel.selectedRegion.collectAsState()
-    val exercises by viewModel.exercisesByRegion.collectAsState()
+    val templates by viewModel.templatesByRegion.collectAsState()
 
     BackHandler(enabled = selectedRegion != null) {
         viewModel.selectRegion(null)
@@ -396,8 +397,23 @@ fun WorkoutsByMuscleScreen(onBack: () -> Unit) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(exercises) { exercise ->
-                    ExerciseListItem(exercise.name)
+                if (templates.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillParentMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Тренировок для этой группы не найдено",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    items(templates) { (template, exercises) ->
+                        TemplateCard(template.name, exercises)
+                    }
                 }
             }
         }
@@ -425,43 +441,6 @@ fun RegionCard(region: BodyRegion, onClick: () -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
-    }
-}
-
-@Composable
-fun ExerciseListItem(name: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.FitnessCenter, 
-                        null, 
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
             )
         }
     }

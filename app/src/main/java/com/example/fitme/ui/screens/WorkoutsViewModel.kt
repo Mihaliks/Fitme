@@ -4,12 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fitme.data.AppDatabase
-import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
-import com.example.fitme.data.repositories.ExerciseRepository
 import com.example.fitme.data.repositories.WorkoutRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -26,7 +25,6 @@ import kotlinx.coroutines.launch
 class WorkoutsViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     private val workoutRepository = WorkoutRepository(db)
-    private val exerciseRepository = ExerciseRepository(db.exerciseDao())
 
     private val _plans = workoutRepository.getAllPlans()
     
@@ -55,19 +53,44 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val _selectedRegion = MutableStateFlow<BodyRegion?>(null)
     val selectedRegion: StateFlow<BodyRegion?> = _selectedRegion.asStateFlow()
 
-    val exercisesByRegion: StateFlow<List<Exercise>> = _selectedRegion
-        .flatMapLatest { region ->
-            if (region == null) {
-                flowOf(emptyList())
-            } else {
-                exerciseRepository.getAllExercisesByBodyRegion(region)
+    val templatesByRegion: StateFlow<List<Pair<WorkoutTemplate, List<ExerciseWithDetails>>>> = combine(
+        _plans,
+        _selectedRegion
+    ) { plans, region ->
+        plans to region
+    }.flatMapLatest { (plans, region) ->
+        if (region == null) return@flatMapLatest flowOf(emptyList())
+        flow {
+            val result = mutableListOf<Pair<WorkoutTemplate, List<ExerciseWithDetails>>>()
+            plans.forEach { plan ->
+                val templates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(plan.id)
+                templates.forEach { template ->
+                    val exercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(template.id)
+                    
+                    val isMatch = if (region == BodyRegion.FULL_BODY) {
+                        // Для "Все тело" показываем тренировки, у которых в названии или в названии плана
+                        // есть "фулбади" или "full body", либо есть упражнения с типом FULL_BODY
+                        plan.name.contains("фулбади", ignoreCase = true) ||
+                        plan.name.contains("full body", ignoreCase = true) ||
+                        template.name.contains("фулбади", ignoreCase = true) ||
+                        template.name.contains("full body", ignoreCase = true) ||
+                        exercises.any { it.exercise.bodyRegion == BodyRegion.FULL_BODY }
+                    } else {
+                        exercises.any { it.exercise.bodyRegion == region }
+                    }
+
+                    if (isMatch) {
+                        result.add(template to exercises)
+                    }
+                }
             }
+            emit(result)
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -92,11 +115,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun startWorkout(planId: Int) {
         viewModelScope.launch {
-            val nextWorkout = workoutRepository.createNextWorkoutSession(planId)
-            if (nextWorkout != null) {
-                // В реальном приложении здесь был бы переход на экран выполнения тренировки
-                // Но так как мы меняем только UI, мы просто логгируем или обновляем статус
-            }
+            workoutRepository.createNextWorkoutSession(planId)
         }
     }
 }
