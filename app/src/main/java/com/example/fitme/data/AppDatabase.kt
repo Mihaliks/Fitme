@@ -37,7 +37,7 @@ import com.example.fitme.data.entities.converters.Converter
         WorkoutSession::class,
         WorkoutTemplate::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converter::class)

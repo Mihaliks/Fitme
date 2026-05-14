@@ -47,6 +47,15 @@ abstract class WorkoutPlanDao {
     @Query("SELECT * FROM workout_templates WHERE id = :workoutTemplateId")
     abstract suspend fun getWorkoutTemplateById(workoutTemplateId: Int): WorkoutTemplate?
 
+    @Query("SELECT * FROM workout_templates WHERE is_builtin = 1 AND plan_id IS NULL ORDER BY `order`")
+    abstract fun getBuiltInWorkoutTemplates(): Flow<List<WorkoutTemplate>>
+
+    @Query("SELECT * FROM workout_templates WHERE is_builtin = 1 AND plan_id IS NULL ORDER BY `order`")
+    abstract suspend fun getBuiltInWorkoutTemplatesOnce(): List<WorkoutTemplate>
+
+    @Query("SELECT COUNT(*) FROM workout_templates WHERE is_builtin = 1 AND plan_id IS NULL")
+    abstract suspend fun getBuiltInWorkoutTemplateCount(): Int
+
     @Query("SELECT * FROM workout_templates WHERE plan_id = :planId ORDER BY `order`")
     abstract fun getWorkoutTemplatesForPlan(planId: Int): Flow<List<WorkoutTemplate>>
 

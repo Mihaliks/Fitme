@@ -35,14 +35,18 @@ class WorkoutRepository(private val db: AppDatabase) {
     fun getActivePlans() = workoutPlanDao.getAllActivePlans()
     fun getInactivePlans() = workoutPlanDao.getAllInactivePlans()
     fun getAllPlans() = workoutPlanDao.getAllPlans()
+    fun getBuiltInWorkoutTemplates() = workoutPlanDao.getBuiltInWorkoutTemplates()
     suspend fun archivePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = false))
     suspend fun restorePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = true))
     suspend fun updatePlan(plan: Plan) =
         workoutPlanDao.updatePlan(plan.copy(name = validateName(plan.name, "Plan name")))
 
     suspend fun removeWorkoutTemplateForPlan(workoutTemplate: WorkoutTemplate) = db.withTransaction {
+        val planId = requireNotNull(workoutTemplate.planId) {
+            "Workout template does not belong to a plan"
+        }
         workoutPlanDao.deleteWorkoutTemplate(workoutTemplate)
-        val remainingIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(workoutTemplate.planId)
+        val remainingIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(planId)
         remainingIds.forEachIndexed { index, id ->
             workoutPlanDao.setWorkoutTemplateOrder(id, index + 1)
         }
@@ -51,6 +55,29 @@ class WorkoutRepository(private val db: AppDatabase) {
     //добавить тренировку в конец плана
     suspend fun appendWorkoutTemplate(name: String, planId: Int): Long =
         workoutPlanDao.appendWorkoutTemplate(validateName(name, "Workout template name"), planId)
+
+    suspend fun duplicateWorkoutTemplateToPlan(
+        workoutTemplate: WorkoutTemplate,
+        targetPlanId: Int,
+        name: String = workoutTemplate.name,
+    ): Long = db.withTransaction {
+        require(workoutPlanDao.getPlanById(targetPlanId) != null) {
+            "Target plan not found"
+        }
+        val newTemplateId = appendWorkoutTemplate(name, targetPlanId).toInt()
+        val sourceExercises = exerciseToDoDao.getExerciseDetailsForWorkoutOnce(workoutTemplate.id)
+        sourceExercises.forEachIndexed { index, details ->
+            val source = details.exerciseToDo
+            val copy = source.copy(
+                id = 0,
+                workoutTemplateId = newTemplateId,
+                order = index + 1,
+            )
+            validateExerciseToDo(copy)
+            exerciseToDoDao.insertExerciseToDo(copy)
+        }
+        newTemplateId.toLong()
+    }
 
     //поменять список тренировок в новом порядке
     suspend fun reorderWorkoutTemplates(
@@ -113,6 +140,18 @@ class WorkoutRepository(private val db: AppDatabase) {
     //показывает какая сессия будет создана, собирает сессию, но не создает запись в бд
     suspend fun peekNextWorkoutSession(planId: Int): NextWorkoutPreview? {
         val nextTemplate = pickNextTemplate(planId) ?: return null
+        return buildWorkoutPreview(nextTemplate)
+    }
+
+    suspend fun peekWorkoutSessionForTemplate(workoutTemplateId: Int): NextWorkoutPreview? {
+        val template = workoutPlanDao.getWorkoutTemplateById(workoutTemplateId) ?: return null
+        if (!template.isBuiltIn) return null
+        return buildWorkoutPreview(template)
+    }
+
+    private suspend fun buildWorkoutPreview(
+        nextTemplate: WorkoutTemplate,
+    ): NextWorkoutPreview {
         val exercises = exerciseToDoDao.getExerciseDetailsForWorkoutOnce(nextTemplate.id)
         val plans = exercises.map { details ->
             val etd = details.exerciseToDo
@@ -136,6 +175,17 @@ class WorkoutRepository(private val db: AppDatabase) {
     //создает экземпляр сессии и запускает тренировку.
     suspend fun createNextWorkoutSession(planId: Int): NextWorkoutPlan? = db.withTransaction {
         val preview = peekNextWorkoutSession(planId) ?: return@withTransaction null
+        createWorkoutSessionFromPreview(preview)
+    }
+
+    suspend fun createWorkoutSessionFromTemplate(workoutTemplateId: Int): NextWorkoutPlan? = db.withTransaction {
+        val preview = peekWorkoutSessionForTemplate(workoutTemplateId) ?: return@withTransaction null
+        createWorkoutSessionFromPreview(preview)
+    }
+
+    private suspend fun createWorkoutSessionFromPreview(
+        preview: NextWorkoutPreview,
+    ): NextWorkoutPlan {
         val sessionId = workoutSessionDao.insertWorkoutSession(
             WorkoutSession(
                 workoutTemplateId = preview.template.id,
@@ -143,7 +193,7 @@ class WorkoutRepository(private val db: AppDatabase) {
             )
         ).toInt()
 
-        NextWorkoutPlan(
+        return NextWorkoutPlan(
             sessionId = sessionId,
             template = preview.template,
             exercises = preview.exercises,
