@@ -43,6 +43,7 @@ class DatabaseSeederTest {
 
         val exercises = db.exerciseDao().getActiveExercises().first()
         val plans = db.workoutPlanDao().getAllActivePlans().first()
+        val builtInTemplates = db.workoutPlanDao().getBuiltInWorkoutTemplatesOnce()
 
         assertEquals(DefaultSeedData.exercises.size, exercises.size)
         assertTrue(exercises.all { it.isBuiltIn })
@@ -51,11 +52,16 @@ class DatabaseSeederTest {
             exercises.map { it.name },
         )
         assertEquals(DefaultSeedData.plans.map { it.name }, plans.map { it.name })
+        assertEquals(DefaultSeedData.workoutTemplates.map { it.name }, builtInTemplates.map { it.name })
+        assertEquals(DefaultSeedData.workoutTemplates.indices.map { it + 1 }, builtInTemplates.map { it.order })
+        assertTrue(builtInTemplates.all { it.isBuiltIn })
+        assertTrue(builtInTemplates.all { it.planId == null })
 
         val fullBodyPlan = plans.first { it.name == "Фулбади для новичка" }
         val fullBodyTemplates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(fullBodyPlan.id)
         assertEquals(listOf("Фулбади A", "Фулбади B"), fullBodyTemplates.map { it.name })
         assertEquals(listOf(1, 2), fullBodyTemplates.map { it.order })
+        assertEquals(listOf(false, false), fullBodyTemplates.map { it.isBuiltIn })
 
         val firstTemplateExercises = db.exerciseToDoDao()
             .getExerciseDetailsForWorkoutOnce(fullBodyTemplates.first().id)
@@ -73,9 +79,11 @@ class DatabaseSeederTest {
 
         val exercises = db.exerciseDao().getActiveExercises().first()
         val plans = db.workoutPlanDao().getAllActivePlans().first()
+        val builtInTemplates = db.workoutPlanDao().getBuiltInWorkoutTemplatesOnce()
 
         assertEquals(DefaultSeedData.exercises.size, exercises.size)
         assertEquals(DefaultSeedData.plans.size, plans.size)
+        assertEquals(DefaultSeedData.workoutTemplates.size, builtInTemplates.size)
     }
 
     @Test

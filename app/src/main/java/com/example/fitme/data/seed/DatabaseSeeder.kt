@@ -13,6 +13,7 @@ class DatabaseSeeder(
 
     suspend fun seedIfNeeded() = db.withTransaction {
         val exerciseIdsByName = seedExercises()
+        seedWorkoutTemplates(exerciseIdsByName)
         if (db.workoutPlanDao().getPlanCount() == 0) {
             seedPlans(exerciseIdsByName)
         }
@@ -30,6 +31,25 @@ class DatabaseSeeder(
         return idsByName
     }
 
+    private suspend fun seedWorkoutTemplates(exerciseIdsByName: Map<String, Int>) {
+        if (db.workoutPlanDao().getBuiltInWorkoutTemplateCount() > 0) return
+        seedData.workoutTemplates.forEachIndexed { templateIndex, seedTemplate ->
+            val templateId = db.workoutPlanDao().insertWorkoutTemplate(
+                WorkoutTemplate(
+                    name = seedTemplate.name,
+                    order = templateIndex + 1,
+                    planId = null,
+                    isBuiltIn = true,
+                )
+            ).toInt()
+            seedExercisesToDo(
+                templateId = templateId,
+                exercises = seedTemplate.exercises,
+                exerciseIdsByName = exerciseIdsByName,
+            )
+        }
+    }
+
     private suspend fun seedPlans(exerciseIdsByName: Map<String, Int>) {
         seedData.plans.forEach { seedPlan ->
             val planId = db.workoutPlanDao().insertPlan(
@@ -45,24 +65,36 @@ class DatabaseSeeder(
                     )
                 ).toInt()
 
-                seedTemplate.exercises.forEachIndexed { exerciseIndex, seedExercise ->
-                    val exerciseId = requireNotNull(exerciseIdsByName[seedExercise.exerciseName]) {
-                        "Seed exercise not found: ${seedExercise.exerciseName}"
-                    }
-                    db.exerciseToDoDao().insertExerciseToDo(
-                        ExerciseToDo(
-                            exerciseId = exerciseId,
-                            workoutTemplateId = templateId,
-                            sets = seedExercise.sets,
-                            reps = seedExercise.reps,
-                            weight = seedExercise.weight,
-                            duration = seedExercise.duration,
-                            order = exerciseIndex + 1,
-                            trainingMode = seedExercise.trainingMode,
-                        )
-                    )
-                }
+                seedExercisesToDo(
+                    templateId = templateId,
+                    exercises = seedTemplate.exercises,
+                    exerciseIdsByName = exerciseIdsByName,
+                )
             }
+        }
+    }
+
+    private suspend fun seedExercisesToDo(
+        templateId: Int,
+        exercises: List<SeedExerciseToDo>,
+        exerciseIdsByName: Map<String, Int>,
+    ) {
+        exercises.forEachIndexed { exerciseIndex, seedExercise ->
+            val exerciseId = requireNotNull(exerciseIdsByName[seedExercise.exerciseName]) {
+                "Seed exercise not found: ${seedExercise.exerciseName}"
+            }
+            db.exerciseToDoDao().insertExerciseToDo(
+                ExerciseToDo(
+                    exerciseId = exerciseId,
+                    workoutTemplateId = templateId,
+                    sets = seedExercise.sets,
+                    reps = seedExercise.reps,
+                    weight = seedExercise.weight,
+                    duration = seedExercise.duration,
+                    order = exerciseIndex + 1,
+                    trainingMode = seedExercise.trainingMode,
+                )
+            )
         }
     }
 }

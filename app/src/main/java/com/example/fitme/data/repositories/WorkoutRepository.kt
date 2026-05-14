@@ -35,14 +35,18 @@ class WorkoutRepository(private val db: AppDatabase) {
     fun getActivePlans() = workoutPlanDao.getAllActivePlans()
     fun getInactivePlans() = workoutPlanDao.getAllInactivePlans()
     fun getAllPlans() = workoutPlanDao.getAllPlans()
+    fun getBuiltInWorkoutTemplates() = workoutPlanDao.getBuiltInWorkoutTemplates()
     suspend fun archivePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = false))
     suspend fun restorePlan(plan: Plan) = workoutPlanDao.updatePlan(plan.copy(isActive = true))
     suspend fun updatePlan(plan: Plan) =
         workoutPlanDao.updatePlan(plan.copy(name = validateName(plan.name, "Plan name")))
 
     suspend fun removeWorkoutTemplateForPlan(workoutTemplate: WorkoutTemplate) = db.withTransaction {
+        val planId = requireNotNull(workoutTemplate.planId) {
+            "Workout template does not belong to a plan"
+        }
         workoutPlanDao.deleteWorkoutTemplate(workoutTemplate)
-        val remainingIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(workoutTemplate.planId)
+        val remainingIds = workoutPlanDao.getWorkoutTemplateIdsForPlan(planId)
         remainingIds.forEachIndexed { index, id ->
             workoutPlanDao.setWorkoutTemplateOrder(id, index + 1)
         }
@@ -141,6 +145,7 @@ class WorkoutRepository(private val db: AppDatabase) {
 
     suspend fun peekWorkoutSessionForTemplate(workoutTemplateId: Int): NextWorkoutPreview? {
         val template = workoutPlanDao.getWorkoutTemplateById(workoutTemplateId) ?: return null
+        if (!template.isBuiltIn) return null
         return buildWorkoutPreview(template)
     }
 

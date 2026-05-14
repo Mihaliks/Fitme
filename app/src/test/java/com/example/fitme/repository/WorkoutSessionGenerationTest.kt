@@ -55,6 +55,11 @@ class WorkoutSessionGenerationTest {
             WorkoutTemplate(name = name, planId = planId, order = order)
         ).toInt()
 
+    private suspend fun newBuiltInTemplate(name: String, order: Int): Int =
+        db.workoutPlanDao().insertWorkoutTemplate(
+            WorkoutTemplate(name = name, planId = null, order = order, isBuiltIn = true)
+        ).toInt()
+
     private suspend fun newExercise(name: String = "Жим"): Int =
         db.exerciseDao().insertExercise(
             Exercise(name = name, bodyRegion = BodyRegion.CHEST)
@@ -100,7 +105,7 @@ class WorkoutSessionGenerationTest {
     fun createWorkoutSessionFromTemplateUsesRequestedTemplate() = runBlocking {
         val planId = newPlan()
         val firstTemplateId = newTemplate(planId, "A", order = 1)
-        val secondTemplateId = newTemplate(planId, "B", order = 2)
+        val secondTemplateId = newBuiltInTemplate("B", order = 2)
         val exerciseId = newExercise("Жим")
         newExerciseToDo(secondTemplateId, exerciseId)
 
@@ -119,6 +124,15 @@ class WorkoutSessionGenerationTest {
     @Test
     fun createWorkoutSessionFromTemplateReturnsNullForMissingTemplate() = runBlocking {
         assertNull(repository.createWorkoutSessionFromTemplate(workoutTemplateId = 999))
+    }
+
+    @Test
+    fun createWorkoutSessionFromTemplateReturnsNullForCustomTemplate() = runBlocking {
+        val planId = newPlan()
+        val templateId = newTemplate(planId, "Custom", order = 1)
+
+        assertNull(repository.peekWorkoutSessionForTemplate(templateId))
+        assertNull(repository.createWorkoutSessionFromTemplate(templateId))
     }
 
     @Test

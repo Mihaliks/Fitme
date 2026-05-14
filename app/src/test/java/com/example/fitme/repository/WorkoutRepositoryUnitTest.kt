@@ -198,6 +198,7 @@ class WorkoutRepositoryUnitTest {
         val targetPlan = repository.getWorkoutTemplatesByPlanId(targetPlanId)!!
         assertEquals(listOf("Existing", "Верх копия"), targetPlan.workoutTemplates.map { it.name })
         assertEquals(listOf(1, 2), targetPlan.workoutTemplates.map { it.order })
+        assertEquals(listOf(false, false), targetPlan.workoutTemplates.map { it.isBuiltIn })
 
         val copiedExercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(copyTemplateId)
         assertEquals(listOf(benchId, rowId), copiedExercises.map { it.exerciseToDo.exerciseId })
