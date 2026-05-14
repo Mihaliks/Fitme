@@ -97,6 +97,31 @@ class WorkoutSessionGenerationTest {
     }
 
     @Test
+    fun createWorkoutSessionFromTemplateUsesRequestedTemplate() = runBlocking {
+        val planId = newPlan()
+        val firstTemplateId = newTemplate(planId, "A", order = 1)
+        val secondTemplateId = newTemplate(planId, "B", order = 2)
+        val exerciseId = newExercise("Жим")
+        newExerciseToDo(secondTemplateId, exerciseId)
+
+        val session = repository.createWorkoutSessionFromTemplate(secondTemplateId)
+
+        assertNotNull(session)
+        assertEquals(secondTemplateId, session!!.template.id)
+        assertEquals(listOf(exerciseId), session.exercises.map { it.exercise.id })
+        assertEquals(
+            secondTemplateId,
+            db.workoutSessionDao().getWorkoutSessionById(session.sessionId)!!.workoutTemplateId,
+        )
+        assertEquals(firstTemplateId, repository.peekNextWorkoutSession(planId)!!.template.id)
+    }
+
+    @Test
+    fun createWorkoutSessionFromTemplateReturnsNullForMissingTemplate() = runBlocking {
+        assertNull(repository.createWorkoutSessionFromTemplate(workoutTemplateId = 999))
+    }
+
+    @Test
     fun picksFirstTemplateWhenNoSessionsYet() = runBlocking {
         val planId = newPlan()
         val firstId = newTemplate(planId, "A", order = 1)
