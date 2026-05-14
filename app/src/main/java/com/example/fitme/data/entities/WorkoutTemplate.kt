@@ -22,5 +22,6 @@ data class WorkoutTemplate(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
     val order: Int,
-    @ColumnInfo(name = "plan_id") val planId: Int
+    @ColumnInfo(name = "plan_id") val planId: Int?,
+    @ColumnInfo(name = "is_builtin") val isBuiltIn: Boolean = false,
 )

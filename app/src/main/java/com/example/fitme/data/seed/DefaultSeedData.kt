@@ -88,54 +88,69 @@ object DefaultSeedData {
         ),
     )
 
+    private val fullBodyA = SeedWorkoutTemplate(
+        name = "Фулбади A",
+        exercises = listOf(
+            SeedExerciseToDo("Приседания со штангой", sets = 3, reps = 8),
+            SeedExerciseToDo("Жим лежа", sets = 3, reps = 8),
+            SeedExerciseToDo("Тяга штанги в наклоне", sets = 3, reps = 10),
+            SeedExerciseToDo("Планка", sets = 3, reps = 1, duration = 60, trainingMode = TrainingMode.NONE),
+        ),
+    )
+
+    private val fullBodyB = SeedWorkoutTemplate(
+        name = "Фулбади B",
+        exercises = listOf(
+            SeedExerciseToDo("Румынская тяга", sets = 3, reps = 8),
+            SeedExerciseToDo("Жим стоя", sets = 3, reps = 8),
+            SeedExerciseToDo("Подтягивания", sets = 3, reps = 6),
+            SeedExerciseToDo("Выпады", sets = 3, reps = 10),
+        ),
+    )
+
+    private val upper = SeedWorkoutTemplate(
+        name = "Верх",
+        exercises = listOf(
+            SeedExerciseToDo("Жим лежа", sets = 4, reps = 6, trainingMode = TrainingMode.STRENGTH),
+            SeedExerciseToDo("Подтягивания", sets = 4, reps = 6, trainingMode = TrainingMode.STRENGTH),
+            SeedExerciseToDo("Жим гантелей на наклонной скамье", sets = 3, reps = 10),
+            SeedExerciseToDo("Подъем гантелей в стороны", sets = 3, reps = 12),
+            SeedExerciseToDo("Сгибание рук со штангой", sets = 3, reps = 10),
+            SeedExerciseToDo("Французский жим", sets = 3, reps = 10),
+        ),
+    )
+
+    private val lower = SeedWorkoutTemplate(
+        name = "Низ",
+        exercises = listOf(
+            SeedExerciseToDo("Приседания со штангой", sets = 4, reps = 6, trainingMode = TrainingMode.STRENGTH),
+            SeedExerciseToDo("Румынская тяга", sets = 4, reps = 8),
+            SeedExerciseToDo("Выпады", sets = 3, reps = 10),
+            SeedExerciseToDo("Подъемы на икры стоя", sets = 4, reps = 12),
+            SeedExerciseToDo("Планка", sets = 3, reps = 1, duration = 60, trainingMode = TrainingMode.NONE),
+        ),
+    )
+
+    val workoutTemplates = listOf(
+        fullBodyA,
+        fullBodyB,
+        upper,
+        lower,
+    )
+
     val plans = listOf(
         SeedPlan(
             name = "Фулбади для новичка",
             templates = listOf(
-                SeedWorkoutTemplate(
-                    name = "Фулбади A",
-                    exercises = listOf(
-                        SeedExerciseToDo("Приседания со штангой", sets = 3, reps = 8),
-                        SeedExerciseToDo("Жим лежа", sets = 3, reps = 8),
-                        SeedExerciseToDo("Тяга штанги в наклоне", sets = 3, reps = 10),
-                        SeedExerciseToDo("Планка", sets = 3, reps = 1, duration = 60, trainingMode = TrainingMode.NONE),
-                    ),
-                ),
-                SeedWorkoutTemplate(
-                    name = "Фулбади B",
-                    exercises = listOf(
-                        SeedExerciseToDo("Румынская тяга", sets = 3, reps = 8),
-                        SeedExerciseToDo("Жим стоя", sets = 3, reps = 8),
-                        SeedExerciseToDo("Подтягивания", sets = 3, reps = 6),
-                        SeedExerciseToDo("Выпады", sets = 3, reps = 10),
-                    ),
-                ),
+                fullBodyA,
+                fullBodyB,
             ),
         ),
         SeedPlan(
             name = "Верх / низ",
             templates = listOf(
-                SeedWorkoutTemplate(
-                    name = "Верх",
-                    exercises = listOf(
-                        SeedExerciseToDo("Жим лежа", sets = 4, reps = 6, trainingMode = TrainingMode.STRENGTH),
-                        SeedExerciseToDo("Подтягивания", sets = 4, reps = 6, trainingMode = TrainingMode.STRENGTH),
-                        SeedExerciseToDo("Жим гантелей на наклонной скамье", sets = 3, reps = 10),
-                        SeedExerciseToDo("Подъем гантелей в стороны", sets = 3, reps = 12),
-                        SeedExerciseToDo("Сгибание рук со штангой", sets = 3, reps = 10),
-                        SeedExerciseToDo("Французский жим", sets = 3, reps = 10),
-                    ),
-                ),
-                SeedWorkoutTemplate(
-                    name = "Низ",
-                    exercises = listOf(
-                        SeedExerciseToDo("Приседания со штангой", sets = 4, reps = 6, trainingMode = TrainingMode.STRENGTH),
-                        SeedExerciseToDo("Румынская тяга", sets = 4, reps = 8),
-                        SeedExerciseToDo("Выпады", sets = 3, reps = 10),
-                        SeedExerciseToDo("Подъемы на икры стоя", sets = 4, reps = 12),
-                        SeedExerciseToDo("Планка", sets = 3, reps = 1, duration = 60, trainingMode = TrainingMode.NONE),
-                    ),
-                ),
+                upper,
+                lower,
             ),
         ),
     )
