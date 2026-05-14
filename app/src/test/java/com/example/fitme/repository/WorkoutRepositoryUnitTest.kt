@@ -176,6 +176,55 @@ class WorkoutRepositoryUnitTest {
     }
 
     @Test
+    fun duplicateWorkoutTemplateToPlanCopiesTemplateAndExercises() = runBlocking {
+        val sourcePlanId = repository.createNewPlan("Template library").toInt()
+        val targetPlanId = repository.createNewPlan("My plan").toInt()
+        repository.appendWorkoutTemplate("Existing", targetPlanId)
+        val sourceTemplateId = repository.appendWorkoutTemplate("Верх", sourcePlanId).toInt()
+        val benchId = newExercise("Жим")
+        val rowId = newExercise("Тяга")
+        val sourceFirstId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(sourceTemplateId, benchId, sets = 4, reps = 6, weight = 100.0)
+        ).toInt()
+        val sourceSecondId = repository.appendExerciseToWorkoutTemplate(
+            exerciseToDo(sourceTemplateId, rowId, sets = 3, reps = 10, weight = 80.0)
+        ).toInt()
+        val sourceTemplate = db.workoutPlanDao().getWorkoutTemplateById(sourceTemplateId)!!
+
+        val copyTemplateId = repository
+            .duplicateWorkoutTemplateToPlan(sourceTemplate, targetPlanId, name = "Верх копия")
+            .toInt()
+
+        val targetPlan = repository.getWorkoutTemplatesByPlanId(targetPlanId)!!
+        assertEquals(listOf("Existing", "Верх копия"), targetPlan.workoutTemplates.map { it.name })
+        assertEquals(listOf(1, 2), targetPlan.workoutTemplates.map { it.order })
+        assertEquals(listOf(false, false), targetPlan.workoutTemplates.map { it.isBuiltIn })
+
+        val copiedExercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(copyTemplateId)
+        assertEquals(listOf(benchId, rowId), copiedExercises.map { it.exerciseToDo.exerciseId })
+        assertEquals(listOf(1, 2), copiedExercises.map { it.exerciseToDo.order })
+        assertEquals(listOf(4, 3), copiedExercises.map { it.exerciseToDo.sets })
+        assertEquals(listOf(6, 10), copiedExercises.map { it.exerciseToDo.reps })
+        assertEquals(listOf(100.0, 80.0), copiedExercises.map { it.exerciseToDo.weight })
+        assertEquals(listOf(copyTemplateId, copyTemplateId), copiedExercises.map { it.exerciseToDo.workoutTemplateId })
+        assertEquals(
+            emptySet<Int>(),
+            copiedExercises.map { it.exerciseToDo.id }.toSet() intersect setOf(sourceFirstId, sourceSecondId),
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun duplicateWorkoutTemplateToPlanRejectsMissingTargetPlan() {
+        runBlocking {
+            val sourcePlanId = repository.createNewPlan("Template library").toInt()
+            val sourceTemplateId = repository.appendWorkoutTemplate("Верх", sourcePlanId).toInt()
+            val sourceTemplate = db.workoutPlanDao().getWorkoutTemplateById(sourceTemplateId)!!
+
+            repository.duplicateWorkoutTemplateToPlan(sourceTemplate, targetPlanId = 999)
+        }
+    }
+
+    @Test
     fun appendExerciseToWorkoutTemplateAddsExerciseAtEnd() = runBlocking {
         val templateId = newTemplate()
         val benchId = newExercise("Жим")
