@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -547,6 +548,79 @@ fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, exercisesMap: Map<I
     val activePlanId by viewModel.activePlanId.collectAsState()
     val isFollowing = plan.id == activePlanId
 
+    var isReorderMode by remember { mutableStateOf(false) }
+    var localTemplates by remember(templates) { mutableStateOf(templates) }
+
+    if (isReorderMode) {
+        Column(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Изменение порядка", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(localTemplates) { index, template ->
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.DragHandle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(16.dp))
+                            Text(template.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+
+                            IconButton(
+                                onClick = {
+                                    val newList = localTemplates.toMutableList()
+                                    newList[index] = newList[index - 1].also { newList[index - 1] = newList[index] }
+                                    localTemplates = newList
+                                },
+                                enabled = index > 0
+                            ) {
+                                Icon(Icons.Default.ArrowUpward, null)
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    val newList = localTemplates.toMutableList()
+                                    newList[index] = newList[index + 1].also { newList[index + 1] = newList[index] }
+                                    localTemplates = newList
+                                },
+                                enabled = index < localTemplates.size - 1
+                            ) {
+                                Icon(Icons.Default.ArrowDownward, null)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        localTemplates = templates
+                        isReorderMode = false
+                    },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Отмена")
+                }
+
+                Button(
+                    onClick = {
+                        viewModel.reorderTemplates(localTemplates.map { it.id })
+                        isReorderMode = false
+                    },
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.Save, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Сохранить")
+                }
+            }
+        }
+        return
+    }
+
     LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 80.dp)) {
         item { OutlinedTextField(value = plan.name, onValueChange = { viewModel.updatePlanName(it) }, label = { Text("Название плана") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) }
         item {
@@ -559,6 +633,7 @@ fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, exercisesMap: Map<I
         }
         items(templates) { template -> TemplateEditorCard(template, exercisesMap[template.id] ?: emptyList(), viewModel) }
         item { Button(onClick = { viewModel.addWorkoutDay() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Add, null); Text("Добавить день") } }
+        item { Button(onClick = { isReorderMode = true }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Icon(Icons.Default.SwapVert, null); Spacer(Modifier.width(8.dp)); Text("Режим перестановки") } }
         item { TextButton(onClick = onNavigateToHidden, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.VisibilityOff, null); Text("Скрытые дни") } }
         item { Button(onClick = { viewModel.closeConstructor() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Icon(Icons.Default.Check, null); Text("Завершить") } }
     }

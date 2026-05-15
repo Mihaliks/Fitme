@@ -250,6 +250,14 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun reorderTemplates(orderedIds: List<Int>) {
+        val planId = _editingPlan.value?.id ?: return
+        viewModelScope.launch {
+            workoutRepository.reorderWorkoutTemplates(planId, orderedIds)
+            refreshEditingData(planId)
+        }
+    }
+
     fun hideTemplate(template: WorkoutTemplate) {
         viewModelScope.launch {
             val currentHidden = _hiddenTemplateIds.value.toMutableSet()
