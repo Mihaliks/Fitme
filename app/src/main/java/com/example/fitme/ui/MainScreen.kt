@@ -18,6 +18,7 @@ import com.example.fitme.ui.screens.ProgressScreen
 import com.example.fitme.ui.screens.SettingsScreen
 import com.example.fitme.ui.screens.UserSetupScreen
 import com.example.fitme.ui.screens.WelcomeScreen
+import com.example.fitme.ui.screens.WorkoutHistoryScreen
 import com.example.fitme.ui.screens.WorkoutsScreen
 
 enum class AppState { WELCOME, SETUP, MAIN }
@@ -98,9 +99,12 @@ fun MainScreen() {
                     startDestination = Screen.Progress.route,
                     modifier = Modifier.padding(innerPadding)
                 ) {
-                    composable(Screen.Progress.route) { ProgressScreen() }
+                    composable(Screen.Progress.route) {
+                        ProgressScreen(onNavigateToHistory = { navController.navigate(Screen.WorkoutHistory.route) })
+                    }
                     composable(Screen.Workouts.route) { WorkoutsScreen() }
                     composable(Screen.Settings.route) { SettingsScreen() }
+                    composable(Screen.WorkoutHistory.route) { WorkoutHistoryScreen() }
                 }
             }
         }
