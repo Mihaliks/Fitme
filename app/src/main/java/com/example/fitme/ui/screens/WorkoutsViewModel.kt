@@ -12,7 +12,9 @@ import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
+import com.example.fitme.data.models.NextWorkoutPlan
 import com.example.fitme.data.repositories.ExerciseRepository
+import com.example.fitme.data.repositories.UserRepository
 import com.example.fitme.data.repositories.WorkoutRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 class WorkoutsViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     private val workoutRepository = WorkoutRepository(db)
+    private val userRepository = UserRepository(db.userDao())
     private val exerciseRepository = ExerciseRepository(db.exerciseDao())
     private val prefs = application.getSharedPreferences("workout_ui_prefs", Context.MODE_PRIVATE)
 
@@ -69,6 +72,15 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    val activePlanId: StateFlow<Int?> = userRepository.observeActivePlan()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    private val _currentSession = MutableStateFlow<NextWorkoutPlan?>(null)
+    val currentSession = _currentSession.asStateFlow()
+
+    private val _currentExerciseIndex = MutableStateFlow(0)
+    val currentExerciseIndex = _currentExerciseIndex.asStateFlow()
 
     private val _selectedPlanTemplates = MutableStateFlow<List<WorkoutTemplate>>(emptyList())
     val selectedPlanTemplates: StateFlow<List<WorkoutTemplate>> = _selectedPlanTemplates.asStateFlow()
@@ -171,7 +183,33 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun startWorkout(planId: Int) {
         viewModelScope.launch {
-            workoutRepository.createNextWorkoutSession(planId)
+            val session = workoutRepository.createNextWorkoutSession(planId)
+            _currentSession.value = session
+            _currentExerciseIndex.value = 0
+        }
+    }
+
+    fun nextExercise() {
+        val session = _currentSession.value ?: return
+        if (_currentExerciseIndex.value < session.exercises.size - 1) {
+            _currentExerciseIndex.value++
+        }
+    }
+
+    fun previousExercise() {
+        if (_currentExerciseIndex.value > 0) {
+            _currentExerciseIndex.value--
+        }
+    }
+
+    fun finishSession() {
+        _currentSession.value = null
+        _currentExerciseIndex.value = 0
+    }
+
+    fun selectPlanAsActive(planId: Int?) {
+        viewModelScope.launch {
+            userRepository.setActivePlan(planId)
         }
     }
 

@@ -43,7 +43,14 @@ enum class WorkoutsSubScreen {
 
 @Composable
 fun WorkoutsScreen() {
+    val viewModel: WorkoutsViewModel = viewModel()
+    val currentSession by viewModel.currentSession.collectAsState()
     var currentSubScreen by remember { mutableStateOf(WorkoutsSubScreen.MAIN) }
+
+    if (currentSession != null) {
+        WorkoutSessionScreen(viewModel = viewModel)
+        return
+    }
 
     BackHandler(enabled = currentSubScreen != WorkoutsSubScreen.MAIN) {
         currentSubScreen = when (currentSubScreen) {
@@ -83,6 +90,11 @@ fun WorkoutsScreen() {
 
 @Composable
 fun WorkoutsMainSelection(onNavigate: (WorkoutsSubScreen) -> Unit) {
+    val viewModel: WorkoutsViewModel = viewModel()
+    val activePlanId by viewModel.activePlanId.collectAsState()
+    val plans by viewModel.activePlans.collectAsState()
+    val activePlan = plans.find { it.id == activePlanId }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -90,10 +102,44 @@ fun WorkoutsMainSelection(onNavigate: (WorkoutsSubScreen) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Выбери уровень",
+            text = "Тренировки",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (activePlan != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigate(WorkoutsSubScreen.READY_MADE) },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(28.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Ваш план:", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
+                        Text(activePlan.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                    Button(
+                        onClick = { viewModel.startWorkout(activePlan.id) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onPrimary, contentColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null)
+                        Text("Начать")
+                    }
+                }
+            }
+        }
+
+        Text(
+            text = "Выбери уровень",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
         )
 
         WorkoutCategoryCard(
@@ -188,6 +234,7 @@ fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val templates by viewModel.selectedPlanTemplates.collectAsState()
     val templateExercises by viewModel.templateExercises.collectAsState()
+    val activePlanId by viewModel.activePlanId.collectAsState()
     var selectedPlan by remember { mutableStateOf<Plan?>(null) }
 
     if (selectedPlan != null) {
@@ -240,6 +287,7 @@ fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
                     items(plans) { plan ->
                         PlanCard(
                             plan = plan,
+                            isActive = plan.id == activePlanId,
                             onClick = {
                                 selectedPlan = plan
                                 viewModel.loadTemplatesForPlan(plan.id)
@@ -254,16 +302,38 @@ fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Button(
-                            onClick = { viewModel.startWorkout(selectedPlan!!.id) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp),
-                            shape = RoundedCornerShape(16.dp)
+                        val isFollowing = selectedPlan?.id == activePlanId
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.PlayArrow, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Начать тренировку", style = MaterialTheme.typography.titleMedium)
+                            Button(
+                                onClick = { viewModel.startWorkout(selectedPlan!!.id) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Начать", style = MaterialTheme.typography.titleMedium)
+                            }
+                            
+                            OutlinedButton(
+                                onClick = { 
+                                    if (isFollowing) viewModel.selectPlanAsActive(null)
+                                    else viewModel.selectPlanAsActive(selectedPlan?.id)
+                                },
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .height(56.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = if (isFollowing) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonColors()
+                            ) {
+                                Icon(if (isFollowing) Icons.Default.Close else Icons.Default.Check, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (isFollowing) "Перестать следовать" else "Выбрать план")
+                            }
                         }
                     }
 
@@ -278,14 +348,15 @@ fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun PlanCard(plan: Plan, onClick: () -> Unit) {
+fun PlanCard(plan: Plan, isActive: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer 
+                             else MaterialTheme.colorScheme.surfaceContainerHigh
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -300,17 +371,31 @@ fun PlanCard(plan: Plan, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                if (isActive) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
             AssistChip(
                 onClick = { },
-                label = { Text("План тренировок") },
-                leadingIcon = { Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp)) }
+                label = { Text(if (isActive) "Активный план" else "План тренировок") },
+                leadingIcon = { 
+                    Icon(
+                        if (isActive) Icons.Default.Star else Icons.Default.Assignment, 
+                        null, 
+                        Modifier.size(16.dp)
+                    ) 
+                }
             )
         }
     }
@@ -630,7 +715,7 @@ fun HiddenPlansScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Скрытые планы", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 }
