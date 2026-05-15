@@ -146,6 +146,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val _workoutHistory = MutableStateFlow<List<HistoryItem>>(emptyList())
     val workoutHistory: StateFlow<List<HistoryItem>> = _workoutHistory.asStateFlow()
 
+    private var workoutStartTime: Long = 0L
+
     init {
         viewModelScope.launch {
             exerciseRepository.getAllActiveExercises().collect { _allExercises.value = it }
@@ -271,6 +273,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _currentSession.value = workoutRepository.createNextWorkoutSession(planId)
             _currentExerciseIndex.value = 0
+            workoutStartTime = System.currentTimeMillis()
         }
     }
 
@@ -280,6 +283,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
             if (session != null) {
                 _currentSession.value = session
                 _currentExerciseIndex.value = 0
+                workoutStartTime = System.currentTimeMillis()
             }
         }
     }
@@ -292,9 +296,21 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
 
     fun finishSession() {
+        val sessionId = _currentSession.value?.sessionId
+        val durationMinutes = if (workoutStartTime > 0) ((System.currentTimeMillis() - workoutStartTime) / 60000).toInt() else 0
+
         _currentSession.value = null
         _currentExerciseIndex.value = 0
+        workoutStartTime = 0L
+
         viewModelScope.launch {
+            if (sessionId != null) {
+                val session = db.workoutSessionDao().getWorkoutSessionById(sessionId)
+                if (session != null) {
+                    db.workoutSessionDao().updateWorkoutSession(session.copy(totalDuration = durationMinutes))
+                }
+                loadHistory()
+            }
             val planId = activePlanId.value
             if (planId != null) {
                 _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)

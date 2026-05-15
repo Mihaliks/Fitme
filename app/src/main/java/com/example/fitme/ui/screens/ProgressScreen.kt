@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
@@ -22,6 +24,11 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
     val plans by viewModel.activePlans.collectAsState()
     val builtInPlans by viewModel.filteredPlans.collectAsState()
     val currentSession by viewModel.currentSession.collectAsState()
+    val history by viewModel.workoutHistory.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.loadHistory()
+    }
 
     if (currentSession != null) {
         WorkoutSessionScreen(viewModel = viewModel)
@@ -34,6 +41,7 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -153,5 +161,7 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
                 }
             }
         }
+
+        AchievementsSection(history = history)
     }
 }
