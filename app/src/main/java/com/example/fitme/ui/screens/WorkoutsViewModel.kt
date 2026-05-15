@@ -207,6 +207,12 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun finishSession() {
         _currentSession.value = null
         _currentExerciseIndex.value = 0
+        viewModelScope.launch {
+            val planId = activePlanId.value
+            if (planId != null) {
+                _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
+            }
+        }
     }
 
     fun selectPlanAsActive(planId: Int?) { viewModelScope.launch { userRepository.setActivePlan(planId) } }

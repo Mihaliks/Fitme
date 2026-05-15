@@ -46,7 +46,7 @@ enum class WorkoutsSubScreen {
 
 @Composable
 fun WorkoutsScreen() {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val currentSession by viewModel.currentSession.collectAsState()
     var currentSubScreen by remember { mutableStateOf(WorkoutsSubScreen.MAIN) }
 
@@ -93,7 +93,7 @@ fun WorkoutsScreen() {
 
 @Composable
 fun WorkoutsMainSelection(onNavigate: (WorkoutsSubScreen) -> Unit) {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val activePlanId by viewModel.activePlanId.collectAsState()
     val plans by viewModel.activePlans.collectAsState()
     val activePlan = plans.find { it.id == activePlanId }
@@ -232,7 +232,7 @@ fun WorkoutCategoryCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val plans by viewModel.filteredPlans.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val templates by viewModel.selectedPlanTemplates.collectAsState()
@@ -392,7 +392,7 @@ fun TemplateCard(template: WorkoutTemplate, exercises: List<ExerciseWithDetails>
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutsByMuscleScreen(onBack: () -> Unit) {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val selectedRegion by viewModel.selectedRegion.collectAsState()
     val templates by viewModel.templatesByRegion.collectAsState()
 
@@ -438,7 +438,7 @@ fun BodyRegion.toRussian(): String = when (this) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutConstructorScreen(onBack: () -> Unit, onNavigateToHidden: () -> Unit, onNavigateToHiddenPlans: () -> Unit) {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val editingPlan by viewModel.editingPlan.collectAsState()
     val editingTemplates by viewModel.editingTemplates.collectAsState()
     val editingExercises by viewModel.editingExercises.collectAsState()
@@ -546,7 +546,7 @@ fun PlanListItem(plan: Plan, isActive: Boolean, isBuiltIn: Boolean, onEdit: () -
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HiddenPlansScreen(onBack: () -> Unit) {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val hiddenPlans by viewModel.hiddenPlans.collectAsState()
     val activePlanId by viewModel.activePlanId.collectAsState()
 
@@ -719,7 +719,7 @@ fun ExercisePickerDialog(exercises: List<Exercise>, onDismiss: () -> Unit, onSel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HiddenTemplatesScreen(onBack: () -> Unit) {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val hiddenTemplates by viewModel.hiddenEditingTemplates.collectAsState()
     val exercisesMap by viewModel.editingExercises.collectAsState()
 

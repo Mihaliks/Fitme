@@ -16,10 +16,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun ProgressScreen() {
-    val viewModel: WorkoutsViewModel = viewModel()
+    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val activePlanId by viewModel.activePlanId.collectAsState()
     val plans by viewModel.activePlans.collectAsState()
     val builtInPlans by viewModel.filteredPlans.collectAsState()
+    val currentSession by viewModel.currentSession.collectAsState()
+
+    if (currentSession != null) {
+        WorkoutSessionScreen(viewModel = viewModel)
+        return
+    }
 
     val activePlan = plans.find { it.id == activePlanId } ?: builtInPlans.find { it.id == activePlanId }
     val nextWorkoutPreview by viewModel.nextWorkoutPreview.collectAsState()
