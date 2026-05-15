@@ -104,7 +104,9 @@ fun MainScreen() {
                     }
                     composable(Screen.Workouts.route) { WorkoutsScreen() }
                     composable(Screen.Settings.route) { SettingsScreen() }
-                    composable(Screen.WorkoutHistory.route) { WorkoutHistoryScreen() }
+                    composable(Screen.WorkoutHistory.route) {
+                        WorkoutHistoryScreen(onBack = { navController.popBackStack() })
+                    }
                 }
             }
         }

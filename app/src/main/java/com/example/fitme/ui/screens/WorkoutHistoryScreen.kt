@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -16,7 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun WorkoutHistoryScreen() {
+fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
     val viewModel: WorkoutsViewModel = viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val history by viewModel.workoutHistory.collectAsState()
     val skippedSessionIds by viewModel.skippedSessionIds.collectAsState()
@@ -34,12 +35,24 @@ fun WorkoutHistoryScreen() {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "История тренировок",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "История тренировок",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
         // History List
         LazyColumn(
