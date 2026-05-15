@@ -1,8 +1,6 @@
 package com.example.fitme.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,9 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -36,6 +32,12 @@ import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+
 
 enum class WorkoutsSubScreen {
     MAIN, READY_MADE, BY_MUSCLE, CONSTRUCTOR, HIDDEN_TEMPLATES, HIDDEN_PLANS
@@ -143,7 +145,7 @@ fun WorkoutsMainSelection(onNavigate: (WorkoutsSubScreen) -> Unit) {
         )
 
         WorkoutCategoryCard(
-            title = "lvl 1: Готовые тренировки",
+            title = "lvl 1: Готовые планы тренировок",
             subtitle = "Для новичков",
             icon = Icons.Default.RocketLaunch,
             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -152,8 +154,8 @@ fun WorkoutsMainSelection(onNavigate: (WorkoutsSubScreen) -> Unit) {
         )
 
         WorkoutCategoryCard(
-            title = "lvl 2: По группам мышц",
-            subtitle = "Помощник в создании тренировки",
+            title = "lvl 2: Тренировки по группам мышц",
+            subtitle = "Если нужно быстро включить тренировку",
             icon = Icons.Default.FitnessCenter,
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             modifier = Modifier.weight(1f),
@@ -339,7 +341,7 @@ fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
 
                     items(templates) { template ->
                         val exercises = templateExercises[template.id] ?: emptyList()
-                        TemplateCard(template.name, exercises)
+                        TemplateCard(template, exercises, viewModel)
                     }
                 }
             }
@@ -350,97 +352,36 @@ fun ReadyMadeWorkoutsScreen(onBack: () -> Unit) {
 @Composable
 fun PlanCard(plan: Plan, isActive: Boolean, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer 
-                             else MaterialTheme.colorScheme.surfaceContainerHigh
-        )
+        colors = CardDefaults.cardColors(containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = plan.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                if (isActive) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(plan.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (isActive) Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
             }
             Spacer(modifier = Modifier.height(12.dp))
-            AssistChip(
-                onClick = { },
-                label = { Text(if (isActive) "Активный план" else "План тренировок") },
-                leadingIcon = { 
-                    Icon(
-                        if (isActive) Icons.Default.Star else Icons.Default.Assignment, 
-                        null, 
-                        Modifier.size(16.dp)
-                    ) 
-                }
-            )
+            AssistChip(onClick = { }, label = { Text(if (isActive) "Активный план" else "Программа") }, leadingIcon = { Icon(if (isActive) Icons.Default.Star else Icons.AutoMirrored.Filled.Assignment, null, Modifier.size(16.dp)) })
         }
     }
 }
 
 @Composable
-fun TemplateCard(name: String, exercises: List<ExerciseWithDetails>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
+fun TemplateCard(template: WorkoutTemplate, exercises: List<ExerciseWithDetails>, viewModel: WorkoutsViewModel) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(template.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                IconButton(onClick = { viewModel.startWorkoutFromTemplate(template.id) }) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
+            }
             Spacer(Modifier.height(12.dp))
             exercises.forEach { detail ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = detail.exercise.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(detail.exercise.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     val duration = detail.exerciseToDo.duration
-                    Text(
-                        text = if (duration != null && duration > 0) {
-                            "${detail.exerciseToDo.sets} x $duration сек"
-                        } else {
-                            "${detail.exerciseToDo.sets} x ${detail.exerciseToDo.reps}"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(text = if (duration != null && duration > 0) "${detail.exerciseToDo.sets} x $duration сек" else "${detail.exerciseToDo.sets} x ${detail.exerciseToDo.reps}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -454,73 +395,26 @@ fun WorkoutsByMuscleScreen(onBack: () -> Unit) {
     val selectedRegion by viewModel.selectedRegion.collectAsState()
     val templates by viewModel.templatesByRegion.collectAsState()
 
-    BackHandler(enabled = selectedRegion != null) {
-        viewModel.selectRegion(null)
-    }
+    BackHandler(enabled = selectedRegion != null) { viewModel.selectRegion(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        selectedRegion?.toRussian() ?: "lvl 2: По группам мышц",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    ) 
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (selectedRegion != null) {
-                            viewModel.selectRegion(null)
-                        } else {
-                            onBack()
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                }
+                title = { Text(selectedRegion?.toRussian() ?: "lvl 2: По группам мышц", fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = { if (selectedRegion != null) viewModel.selectRegion(null) else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }
             )
         }
     ) { padding ->
         if (selectedRegion == null) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(BodyRegion.entries) { region ->
-                    RegionCard(region) { viewModel.selectRegion(region) }
-                }
+            LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(BodyRegion.entries) { region -> RegionCard(region) { viewModel.selectRegion(region) } }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (templates.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier.fillParentMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Тренировок для этой группы не найдено",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    item { Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { Text("Тренировок не найдено", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                 } else {
-                    items(templates) { (template, exercises) ->
-                        TemplateCard(template.name, exercises)
-                    }
+                    items(templates) { (template, exercises) -> TemplateCard(template, exercises, viewModel) }
                 }
             }
         }
@@ -529,176 +423,97 @@ fun WorkoutsByMuscleScreen(onBack: () -> Unit) {
 
 @Composable
 fun RegionCard(region: BodyRegion, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(110.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-        )
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = region.toRussian(),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
+    Card(modifier = Modifier.fillMaxWidth().height(110.dp).clickable { onClick() }, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(region.toRussian(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
     }
 }
 
 fun BodyRegion.toRussian(): String = when (this) {
-    BodyRegion.CHEST -> "Грудь"
-    BodyRegion.BACK -> "Спина"
-    BodyRegion.SHOULDERS -> "Плечи"
-    BodyRegion.ARMS -> "Руки"
-    BodyRegion.CORE -> "Пресс / Корпус"
-    BodyRegion.GLUTES -> "Ягодицы"
-    BodyRegion.LEGS -> "Ноги"
-    BodyRegion.CALVES -> "Икры"
-    BodyRegion.CARDIO -> "Кардио"
-    BodyRegion.FULL_BODY -> "Все тело"
-    BodyRegion.OTHER -> "Другое"
+    BodyRegion.CHEST -> "Грудь"; BodyRegion.BACK -> "Спина"; BodyRegion.SHOULDERS -> "Плечи"; BodyRegion.ARMS -> "Руки"
+    BodyRegion.CORE -> "Пресс / Корпус"; BodyRegion.GLUTES -> "Ягодицы"; BodyRegion.LEGS -> "Ноги"; BodyRegion.CALVES -> "Икры"
+    BodyRegion.CARDIO -> "Кардио"; BodyRegion.FULL_BODY -> "Все тело"; BodyRegion.OTHER -> "Другое"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutConstructorScreen(
-    onBack: () -> Unit,
-    onNavigateToHidden: () -> Unit,
-    onNavigateToHiddenPlans: () -> Unit
-) {
+fun WorkoutConstructorScreen(onBack: () -> Unit, onNavigateToHidden: () -> Unit, onNavigateToHiddenPlans: () -> Unit) {
     val viewModel: WorkoutsViewModel = viewModel()
     val editingPlan by viewModel.editingPlan.collectAsState()
     val editingTemplates by viewModel.editingTemplates.collectAsState()
     val editingExercises by viewModel.editingExercises.collectAsState()
     val activePlans by viewModel.activePlans.collectAsState()
-    val builtInStatus by viewModel.planBuiltInStatus.collectAsState()
+    val activePlanId by viewModel.activePlanId.collectAsState()
+    val isCreatingNewPlan by viewModel.isCreatingNewPlan.collectAsState()
+    val showEmptyPlanWarning by viewModel.showEmptyPlanWarning.collectAsState()
+
+    if (showEmptyPlanWarning) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissEmptyPlanWarning() },
+            title = { Text("План пуст") },
+            text = { Text("В плане нет ни одного тренировочного дня. Вы уверены, что хотите выйти? Пустой план не будет сохранен.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.cancelPlanCreation() }) { Text("Выйти без сохранения", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissEmptyPlanWarning() }) { Text("Продолжить") }
+            }
+        )
+    }
 
     BackHandler(enabled = editingPlan != null) {
-        viewModel.closeConstructor()
+        if (isCreatingNewPlan) viewModel.cancelPlanCreation() else viewModel.closeConstructor()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        if (editingPlan == null) "lvl 3: Конструктор" else "Редактирование плана",
-                        fontWeight = FontWeight.Bold
-                    ) 
-                },
+                title = { Text(if (editingPlan == null) "lvl 3: Конструктор" else if (isCreatingNewPlan) "Создание плана" else "Редактирование", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = {
                         if (editingPlan != null) {
-                            viewModel.closeConstructor()
-                        } else {
-                            onBack()
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
+                            if (isCreatingNewPlan) viewModel.cancelPlanCreation() else viewModel.closeConstructor()
+                        } else onBack()
+                    }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 },
                 actions = {
                     if (editingPlan == null) {
-                        IconButton(onClick = onNavigateToHiddenPlans) {
-                            Icon(Icons.Default.VisibilityOff, contentDescription = "Скрытые планы")
+                        IconButton(onClick = onNavigateToHiddenPlans) { Icon(Icons.Default.VisibilityOff, null) }
+                    } else if (isCreatingNewPlan) {
+                        TextButton(onClick = { viewModel.cancelPlanCreation() }) {
+                            Text("Отмена", color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
             )
         },
-        floatingActionButton = {
-            if (editingPlan == null) {
-                ExtendedFloatingActionButton(
-                    onClick = { viewModel.createNewPlan() },
-                    icon = { Icon(Icons.Default.Add, null) },
-                    text = { Text("Создать план") }
-                )
-            }
-        }
+        floatingActionButton = { if (editingPlan == null) ExtendedFloatingActionButton(onClick = { viewModel.createNewPlan() }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("Создать план") }) }
     ) { padding ->
         if (editingPlan == null) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    Text("Активные планы", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-
-                if (activePlans.isEmpty()) {
-                    item {
-                        Text("Нет активных планов", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
-                    }
-                }
-
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item { Text("Ваши планы", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                if (activePlans.isEmpty()) item { Text("Нет активных планов", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(activePlans) { plan ->
-                    val isBuiltIn = builtInStatus[plan.id] ?: false
-                    PlanListItem(
-                        plan = plan,
-                        isBuiltIn = isBuiltIn,
-                        onEdit = { viewModel.loadPlanForEditing(plan.id) },
-                        onHide = { viewModel.togglePlanVisibility(plan) }
-                    )
+                    PlanListItem(plan, plan.id == activePlanId, false, { viewModel.loadPlanForEditing(plan.id) }, { viewModel.togglePlanVisibility(plan) }, { viewModel.startWorkout(plan.id) })
                 }
             }
         } else {
-            PlanEditor(
-                plan = editingPlan!!,
-                templates = editingTemplates,
-                exercisesMap = editingExercises,
-                viewModel = viewModel,
-                onNavigateToHidden = onNavigateToHidden,
-                modifier = Modifier.padding(padding)
-            )
+            PlanEditor(editingPlan!!, editingTemplates, editingExercises, viewModel, onNavigateToHidden, Modifier.padding(padding))
         }
     }
 }
 
 @Composable
-fun PlanListItem(
-    plan: Plan,
-    isBuiltIn: Boolean,
-    onEdit: () -> Unit,
-    onHide: () -> Unit,
-    isArchiveScreen: Boolean = false
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onEdit() },
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+fun PlanListItem(plan: Plan, isActive: Boolean, isBuiltIn: Boolean, onEdit: () -> Unit, onHide: () -> Unit, onStart: () -> Unit = {}, isArchiveScreen: Boolean = false) {
+    Card(modifier = Modifier.fillMaxWidth().clickable { onEdit() }, shape = RoundedCornerShape(20.dp), colors = if (isActive) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else CardDefaults.cardColors()) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Filled.Assignment, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(plan.name, style = MaterialTheme.typography.titleMedium)
-                if (isBuiltIn) {
-                    Text("Стандартный", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                }
+                if (isBuiltIn) Text("Стандартный", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             }
-            
-            IconButton(onClick = onHide) {
-                Icon(
-                    if (plan.isActive) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    contentDescription = if (plan.isActive) "Скрыть" else "Восстановить",
-                    tint = if (isArchiveScreen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            if (!isArchiveScreen && !isBuiltIn) IconButton(onClick = onStart) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
+            IconButton(onClick = onHide) { Icon(if (plan.isActive) Icons.Default.VisibilityOff else Icons.Default.Visibility, null) }
         }
     }
 }
@@ -708,181 +523,98 @@ fun PlanListItem(
 fun HiddenPlansScreen(onBack: () -> Unit) {
     val viewModel: WorkoutsViewModel = viewModel()
     val hiddenPlans by viewModel.hiddenPlans.collectAsState()
-    val builtInStatus by viewModel.planBuiltInStatus.collectAsState()
+    val activePlanId by viewModel.activePlanId.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Скрытые планы", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }
             )
         }
     ) { padding ->
-        if (hiddenPlans.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Скрытых планов нет", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (hiddenPlans.isEmpty()) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Скрытых планов нет", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        else {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(hiddenPlans) { plan -> PlanListItem(plan, plan.id == activePlanId, false, { viewModel.loadPlanForEditing(plan.id) }, { viewModel.togglePlanVisibility(plan) }, isArchiveScreen = true) }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(hiddenPlans) { plan ->
-                    val isBuiltIn = builtInStatus[plan.id] ?: false
-                    PlanListItem(
-                        plan = plan,
-                        isBuiltIn = isBuiltIn,
-                        onEdit = { viewModel.loadPlanForEditing(plan.id) },
-                        onHide = { viewModel.togglePlanVisibility(plan) },
-                        isArchiveScreen = true
-                    )
+        }
+    }
+}
+
+@Composable
+fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, exercisesMap: Map<Int, List<ExerciseWithDetails>>, viewModel: WorkoutsViewModel, onNavigateToHidden: () -> Unit, modifier: Modifier = Modifier) {
+    val activePlanId by viewModel.activePlanId.collectAsState()
+    val isFollowing = plan.id == activePlanId
+
+    LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 80.dp)) {
+        item { OutlinedTextField(value = plan.name, onValueChange = { viewModel.updatePlanName(it) }, label = { Text("Название плана") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) }
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { viewModel.startWorkout(plan.id) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.PlayArrow, null); Text("Начать") }
+                OutlinedButton(onClick = { viewModel.selectPlanAsActive(if (isFollowing) null else plan.id) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp), colors = if (isFollowing) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonColors()) {
+                    Icon(if (isFollowing) Icons.Default.Close else Icons.Default.Check, null); Text(if (isFollowing) "Отписаться" else "Выбрать")
                 }
             }
         }
+        items(templates) { template -> TemplateEditorCard(template, exercisesMap[template.id] ?: emptyList(), viewModel) }
+        item { Button(onClick = { viewModel.addWorkoutDay() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Add, null); Text("Добавить день") } }
+        item { TextButton(onClick = onNavigateToHidden, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.VisibilityOff, null); Text("Скрытые дни") } }
+        item { Button(onClick = { viewModel.closeConstructor() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Icon(Icons.Default.Check, null); Text("Завершить") } }
     }
 }
 
 @Composable
-fun PlanEditor(
-    plan: Plan,
-    templates: List<WorkoutTemplate>,
-    exercisesMap: Map<Int, List<ExerciseWithDetails>>,
-    viewModel: WorkoutsViewModel,
-    onNavigateToHidden: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 80.dp)
-    ) {
-        item {
-            OutlinedTextField(
-                value = plan.name,
-                onValueChange = { viewModel.updatePlanName(it) },
-                label = { Text("Название плана") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            )
-        }
-
-        items(templates) { template ->
-            val exercises = exercisesMap[template.id] ?: emptyList()
-            TemplateEditorCard(
-                template = template,
-                exercises = exercises,
-                viewModel = viewModel
-            )
-        }
-
-        item {
-            Button(
-                onClick = { viewModel.addWorkoutDay() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.Add, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Добавить тренировочный день")
-            }
-        }
-
-        item {
-            TextButton(
-                onClick = onNavigateToHidden,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.VisibilityOff, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Скрытые тренировочные дни")
-            }
-        }
-
-        item {
-            Button(
-                onClick = { viewModel.closeConstructor() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) {
-                Icon(Icons.Default.Check, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Сохранить и выйти")
-            }
-        }
-    }
-}
-
-@Composable
-fun TemplateEditorCard(
-    template: WorkoutTemplate,
-    exercises: List<ExerciseWithDetails>,
-    viewModel: WorkoutsViewModel
-) {
-    var showExercisePicker by remember { mutableStateOf(false) }
+fun TemplateEditorCard(template: WorkoutTemplate, exercises: List<ExerciseWithDetails>, viewModel: WorkoutsViewModel) {
+    var showPicker by remember { mutableStateOf(false) }
     val allExercises by viewModel.allExercises.collectAsState()
 
-    if (showExercisePicker) {
-        ExercisePickerDialog(
-            exercises = allExercises,
-            onDismiss = { showExercisePicker = false },
-            onSelect = { 
-                viewModel.addExerciseToTemplate(template.id, it)
-                showExercisePicker = false
-            }
-        )
-    }
+    if (showPicker) ExercisePickerDialog(allExercises, { showPicker = false }, { viewModel.addExerciseToTemplate(template.id, it); showPicker = false })
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    ) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BasicTextField(
-                    value = template.name,
-                    onValueChange = { viewModel.updateTemplateName(template, it) },
-                    textStyle = MaterialTheme.typography.titleMedium.copy(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = { viewModel.hideTemplate(template) }) {
-                    Icon(Icons.Default.VisibilityOff, null, tint = MaterialTheme.colorScheme.outline)
-                }
+                BasicTextField(value = template.name, onValueChange = { viewModel.updateTemplateName(template, it) }, textStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+                IconButton(onClick = { viewModel.startWorkoutFromTemplate(template.id) }) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = { viewModel.hideTemplate(template) }) { Icon(Icons.Default.VisibilityOff, null, tint = MaterialTheme.colorScheme.outline) }
             }
-            
-            Spacer(Modifier.height(8.dp))
-
-            exercises.forEach { detail ->
-                ExerciseEditorItem(
-                    detail = detail,
-                    onUpdate = { viewModel.updateExerciseDetails(it) },
-                    onDelete = { viewModel.removeExercise(detail.exerciseToDo) }
-                )
-            }
-
-            TextButton(
-                onClick = { showExercisePicker = true },
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Добавить упражнение")
-            }
+            exercises.forEach { detail -> ExerciseEditorItem(detail, { viewModel.updateExerciseDetails(it) }, { viewModel.removeExercise(detail.exerciseToDo) }) }
+            TextButton(onClick = { showPicker = true }, modifier = Modifier.align(Alignment.End)) { Icon(Icons.Default.Add, null); Text("Добавить упражнение") }
         }
     }
+}
+
+@Composable
+fun ExerciseEditorItem(detail: ExerciseWithDetails, onUpdate: (ExerciseToDo) -> Unit, onDelete: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(detail.exercise.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            IconButton(onClick = onDelete) { Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error) }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            CompactNumberInput("Подходы", detail.exerciseToDo.sets, { onUpdate(detail.exerciseToDo.copy(sets = it)) }, Modifier.weight(1f))
+            CompactNumberInput("Повторы", detail.exerciseToDo.reps, { onUpdate(detail.exerciseToDo.copy(reps = it)) }, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun CompactNumberInput(label: String, value: Int, onValueChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    OutlinedTextField(value = value.toString(), onValueChange = { it.toIntOrNull()?.let { v -> if (v >= 0) onValueChange(v) } }, label = { Text(label, fontSize = 10.sp) }, modifier = modifier, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), singleLine = true)
+}
+
+@Composable
+fun ExercisePickerDialog(exercises: List<Exercise>, onDismiss: () -> Unit, onSelect: (Exercise) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text("Выберите упражнение") },
+        text = {
+            Column(modifier = Modifier.heightIn(max = 400.dp)) {
+                OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Поиск...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+                LazyColumn { items(exercises.filter { it.name.contains(query, true) }) { ex -> ListItem(headlineContent = { Text(ex.name) }, supportingContent = { Text(ex.bodyRegion.toRussian()) }, modifier = Modifier.clickable { onSelect(ex) }) } }
+            }
+        }, confirmButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -896,159 +628,25 @@ fun HiddenTemplatesScreen(onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Скрытые дни", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } }
             )
         }
     ) { padding ->
-        if (hiddenTemplates.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Скрытых дней нет", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+        if (hiddenTemplates.isEmpty()) Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Скрытых дней нет", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        else {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(hiddenTemplates) { template ->
-                    val exercises = exercisesMap[template.id] ?: emptyList()
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    template.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "${exercises.size} упр.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Text(template.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("${exercisesMap[template.id]?.size ?: 0} упр.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            IconButton(onClick = { viewModel.restoreTemplate(template) }) {
-                                Icon(Icons.Default.Visibility, null, tint = MaterialTheme.colorScheme.primary)
-                            }
+                            IconButton(onClick = { viewModel.restoreTemplate(template) }) { Icon(Icons.Default.Visibility, null, tint = MaterialTheme.colorScheme.primary) }
                         }
                     }
                 }
             }
         }
     }
-}
-
-@Composable
-fun ExerciseEditorItem(
-    detail: ExerciseWithDetails,
-    onUpdate: (ExerciseToDo) -> Unit,
-    onDelete: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                detail.exercise.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error)
-            }
-        }
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CompactNumberInput(
-                label = "Подходы",
-                value = detail.exerciseToDo.sets,
-                onValueChange = { onUpdate(detail.exerciseToDo.copy(sets = it)) },
-                modifier = Modifier.weight(1f)
-            )
-            CompactNumberInput(
-                label = "Повторы",
-                value = detail.exerciseToDo.reps,
-                onValueChange = { onUpdate(detail.exerciseToDo.copy(reps = it)) },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun CompactNumberInput(
-    label: String,
-    value: Int,
-    onValueChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OutlinedTextField(
-        value = value.toString(),
-        onValueChange = { input -> 
-            input.toIntOrNull()?.let { num -> if (num >= 0) onValueChange(num) }
-        },
-        label = { Text(label, fontSize = 12.sp) },
-        modifier = modifier,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        shape = RoundedCornerShape(12.dp),
-        singleLine = true
-    )
-}
-
-@Composable
-fun ExercisePickerDialog(
-    exercises: List<Exercise>,
-    onDismiss: () -> Unit,
-    onSelect: (Exercise) -> Unit
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    val filteredExercises = exercises.filter { it.name.contains(searchQuery, ignoreCase = true) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Выберите упражнение") },
-        text = {
-            Column(modifier = Modifier.heightIn(max = 400.dp)) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Поиск...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
-                )
-                Spacer(Modifier.height(8.dp))
-                LazyColumn {
-                    items(filteredExercises) { exercise ->
-                        ListItem(
-                            headlineContent = { Text(exercise.name) },
-                            supportingContent = { Text(exercise.bodyRegion.toRussian()) },
-                            modifier = Modifier.clickable { onSelect(exercise) }
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
-        }
-    )
 }

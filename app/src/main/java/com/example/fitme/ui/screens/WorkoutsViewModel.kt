@@ -33,54 +33,41 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     private val _plans = workoutRepository.getAllPlans()
 
-    private val _hiddenTemplateIds = MutableStateFlow<Set<Int>>(loadHiddenTemplateIds())
+    private val seedPlanNames = listOf("Фулбади для новичка", "Верх / низ")
+    private val seedTemplateNames = listOf("Фулбади A", "Фулбади B", "Верх", "Низ")
 
-    private fun loadHiddenTemplateIds(): Set<Int> {
-        return prefs.getStringSet("hidden_template_ids", emptySet())
-            ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
-    }
+    val planBuiltInStatus: StateFlow<Map<Int, Boolean>> = _plans.flatMapLatest { plans ->
+        flow {
+            val statusMap = plans.associate { plan ->
+                val templates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(plan.id)
+                val isBuiltIn = templates.any { it.isBuiltIn || it.name in seedTemplateNames } || 
+                               seedPlanNames.any { it.equals(plan.name.trim(), ignoreCase = true) }
+                plan.id to isBuiltIn
+            }
+            emit(statusMap)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    private fun saveHiddenTemplateIds(ids: Set<Int>) {
-        prefs.edit().putStringSet("hidden_template_ids", ids.map { it.toString() }.toSet()).apply()
-    }
+    val filteredPlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery, planBuiltInStatus) { plans, query, status ->
+        val builtIn = plans.filter { status[it.id] == true }
+        if (query.isBlank()) builtIn else builtIn.filter { it.name.contains(query, ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val filteredPlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery) { plans, query ->
-        if (query.isBlank()) plans else plans.filter { it.name.contains(query, ignoreCase = true) }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    val activePlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery, planBuiltInStatus) { plans, query, status ->
+        val activeCustom = plans.filter { it.isActive && status[it.id] == false }
+        if (query.isBlank()) activeCustom else activeCustom.filter { it.name.contains(query, ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _planBuiltInStatus = MutableStateFlow<Map<Int, Boolean>>(emptyMap())
-    val planBuiltInStatus = _planBuiltInStatus.asStateFlow()
-
-    val activePlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery) { plans, query ->
-        val active = plans.filter { it.isActive }
-        if (query.isBlank()) active else active.filter { it.name.contains(query, ignoreCase = true) }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
-
-    val hiddenPlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery) { plans, query ->
-        val inactive = plans.filter { !it.isActive }
-        if (query.isBlank()) inactive else inactive.filter { it.name.contains(query, ignoreCase = true) }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    val hiddenPlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery, planBuiltInStatus) { plans, query, status ->
+        val inactiveCustom = plans.filter { !it.isActive && status[it.id] == false }
+        if (query.isBlank()) inactiveCustom else inactiveCustom.filter { it.name.contains(query, ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val activePlanId: StateFlow<Int?> = userRepository.observeActivePlan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _currentSession = MutableStateFlow<NextWorkoutPlan?>(null)
-    val currentSession = _currentSession.asStateFlow()
-
-    private val _currentExerciseIndex = MutableStateFlow(0)
-    val currentExerciseIndex = _currentExerciseIndex.asStateFlow()
+    private val _selectedPlan = MutableStateFlow<Plan?>(null)
+    val selectedPlan: StateFlow<Plan?> = _selectedPlan.asStateFlow()
 
     private val _selectedPlanTemplates = MutableStateFlow<List<WorkoutTemplate>>(emptyList())
     val selectedPlanTemplates: StateFlow<List<WorkoutTemplate>> = _selectedPlanTemplates.asStateFlow()
@@ -88,45 +75,34 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val _templateExercises = MutableStateFlow<Map<Int, List<ExerciseWithDetails>>>(emptyMap())
     val templateExercises: StateFlow<Map<Int, List<ExerciseWithDetails>>> = _templateExercises.asStateFlow()
 
+    private val _currentSession = MutableStateFlow<NextWorkoutPlan?>(null)
+    val currentSession = _currentSession.asStateFlow()
+
+    private val _currentExerciseIndex = MutableStateFlow(0)
+    val currentExerciseIndex = _currentExerciseIndex.asStateFlow()
+
     private val _selectedRegion = MutableStateFlow<BodyRegion?>(null)
     val selectedRegion: StateFlow<BodyRegion?> = _selectedRegion.asStateFlow()
 
-    val templatesByRegion: StateFlow<List<Pair<WorkoutTemplate, List<ExerciseWithDetails>>>> = combine(
-        filteredPlans,
-        _selectedRegion
-    ) { plans, region ->
-        plans to region
-    }.flatMapLatest { (plans, region) ->
+    val templatesByRegion: StateFlow<List<Pair<WorkoutTemplate, List<ExerciseWithDetails>>>> = _selectedRegion.flatMapLatest { region ->
         if (region == null) return@flatMapLatest flowOf(emptyList())
-        flow {
-            val result = mutableListOf<Pair<WorkoutTemplate, List<ExerciseWithDetails>>>()
-            plans.forEach { plan ->
-                val templates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(plan.id)
-                templates.forEach { template ->
+        workoutRepository.getBuiltInWorkoutTemplates().flatMapLatest { templates ->
+            flow {
+                val result = templates.mapNotNull { template ->
                     val exercises = db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(template.id)
-
                     val isMatch = if (region == BodyRegion.FULL_BODY) {
-                        plan.name.contains("фулбади", ignoreCase = true) ||
-                        plan.name.contains("full body", ignoreCase = true) ||
                         template.name.contains("фулбади", ignoreCase = true) ||
                         template.name.contains("full body", ignoreCase = true) ||
                         exercises.any { it.exercise.bodyRegion == BodyRegion.FULL_BODY }
                     } else {
                         exercises.any { it.exercise.bodyRegion == region }
                     }
-
-                    if (isMatch) {
-                        result.add(template to exercises)
-                    }
+                    if (isMatch) template to exercises else null
                 }
+                emit(result)
             }
-            emit(result)
         }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _editingPlan = MutableStateFlow<Plan?>(null)
     val editingPlan: StateFlow<Plan?> = _editingPlan.asStateFlow()
@@ -143,25 +119,38 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val _allExercises = MutableStateFlow<List<Exercise>>(emptyList())
     val allExercises: StateFlow<List<Exercise>> = _allExercises.asStateFlow()
 
+    private val _isCreatingNewPlan = MutableStateFlow(false)
+    val isCreatingNewPlan: StateFlow<Boolean> = _isCreatingNewPlan.asStateFlow()
+
+    private val _showEmptyPlanWarning = MutableStateFlow(false)
+    val showEmptyPlanWarning: StateFlow<Boolean> = _showEmptyPlanWarning.asStateFlow()
+
+    private val _hiddenTemplateIds = MutableStateFlow<Set<Int>>(loadHiddenTemplateIds())
+
     init {
         viewModelScope.launch {
-            exerciseRepository.getAllActiveExercises().collect {
-                _allExercises.value = it
-            }
-        }
-        viewModelScope.launch {
-            _plans.collect { plans ->
-                val statusMap = mutableMapOf<Int, Boolean>()
-                plans.forEach { plan ->
-                    statusMap[plan.id] = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(plan.id).any { it.isBuiltIn }
-                }
-                _planBuiltInStatus.value = statusMap
-            }
+            exerciseRepository.getAllActiveExercises().collect { _allExercises.value = it }
         }
     }
 
-    fun onSearchQueryChange(query: String) {
-        _searchQuery.value = query
+    private fun loadHiddenTemplateIds(): Set<Int> {
+        return prefs.getStringSet("hidden_template_ids", emptySet())
+            ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+    }
+
+    private fun saveHiddenTemplateIds(ids: Set<Int>) {
+        prefs.edit().putStringSet("hidden_template_ids", ids.map { it.toString() }.toSet()).apply()
+    }
+
+    fun onSearchQueryChange(query: String) { _searchQuery.value = query }
+
+    fun selectPlan(plan: Plan?) {
+        _selectedPlan.value = plan
+        if (plan != null) loadTemplatesForPlan(plan.id)
+        else {
+            _selectedPlanTemplates.value = emptyList()
+            _templateExercises.value = emptyMap()
+        }
     }
 
     fun loadTemplatesForPlan(planId: Int) {
@@ -169,78 +158,71 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
             val result = workoutRepository.getWorkoutTemplatesByPlanId(planId)
             val templates = result?.workoutTemplates ?: emptyList()
             _selectedPlanTemplates.value = templates
-
-            val exerciseMap = templates.associate { template ->
-                template.id to db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(template.id)
+            _templateExercises.value = templates.associate { 
+                it.id to db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(it.id) 
             }
-            _templateExercises.value = exerciseMap
         }
     }
 
-    fun selectRegion(region: BodyRegion?) {
-        _selectedRegion.value = region
-    }
+    fun selectRegion(region: BodyRegion?) { _selectedRegion.value = region }
 
     fun startWorkout(planId: Int) {
         viewModelScope.launch {
-            val session = workoutRepository.createNextWorkoutSession(planId)
-            _currentSession.value = session
+            _currentSession.value = workoutRepository.createNextWorkoutSession(planId)
             _currentExerciseIndex.value = 0
+        }
+    }
+
+    fun startWorkoutFromTemplate(templateId: Int) {
+        viewModelScope.launch {
+            val session = workoutRepository.createWorkoutSessionFromTemplate(templateId)
+            if (session != null) {
+                _currentSession.value = session
+                _currentExerciseIndex.value = 0
+            }
         }
     }
 
     fun nextExercise() {
         val session = _currentSession.value ?: return
-        if (_currentExerciseIndex.value < session.exercises.size - 1) {
-            _currentExerciseIndex.value++
-        }
+        if (_currentExerciseIndex.value < session.exercises.size - 1) _currentExerciseIndex.value++
     }
 
-    fun previousExercise() {
-        if (_currentExerciseIndex.value > 0) {
-            _currentExerciseIndex.value--
-        }
-    }
+    fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
 
     fun finishSession() {
         _currentSession.value = null
         _currentExerciseIndex.value = 0
     }
 
-    fun selectPlanAsActive(planId: Int?) {
-        viewModelScope.launch {
-            userRepository.setActivePlan(planId)
-        }
-    }
+    fun selectPlanAsActive(planId: Int?) { viewModelScope.launch { userRepository.setActivePlan(planId) } }
 
     fun createNewPlan() {
         viewModelScope.launch {
             val planId = workoutRepository.createNewPlan("Новый план")
+            _isCreatingNewPlan.value = true
             loadPlanForEditing(planId.toInt())
         }
     }
 
     fun loadPlanForEditing(planId: Int) {
         viewModelScope.launch {
+            if (planBuiltInStatus.value[planId] == true) return@launch
             val plan = db.workoutPlanDao().getPlanById(planId)
+            if (!_isCreatingNewPlan.value) _isCreatingNewPlan.value = false
             _editingPlan.value = plan
-            if (plan != null) {
-                refreshEditingData(plan.id)
-            }
+            if (plan != null) refreshEditingData(plan.id)
         }
     }
 
     private suspend fun refreshEditingData(planId: Int) {
         val allTemplates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(planId)
         val hiddenIds = _hiddenTemplateIds.value
-
         _editingTemplates.value = allTemplates.filter { it.id !in hiddenIds }
         _hiddenEditingTemplates.value = allTemplates.filter { it.id in hiddenIds }
-
-        val exerciseMap = allTemplates.associate { template ->
-            template.id to db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(template.id)
+        _editingExercises.value = allTemplates.associate { 
+            it.id to db.exerciseToDoDao().getExerciseDetailsForWorkoutOnce(it.id)
         }
-        _editingExercises.value = exerciseMap
     }
 
     fun updatePlanName(name: String) {
@@ -293,9 +275,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
             val exerciseToDo = ExerciseToDo(
                 exerciseId = exercise.id,
                 workoutTemplateId = templateId,
-                sets = 3,
-                reps = 12,
-                order = 0,
+                sets = 3, reps = 12, order = 0,
                 trainingMode = TrainingMode.HYPERTROPHY
             )
             workoutRepository.appendExerciseToWorkoutTemplate(exerciseToDo)
@@ -317,20 +297,40 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun closeConstructor() {
+    fun dismissEmptyPlanWarning() {
+        _showEmptyPlanWarning.value = false
+    }
+
+    fun closeConstructor(force: Boolean = false) {
+        val templates = _editingTemplates.value
+        if (!force && templates.isEmpty()) {
+            _showEmptyPlanWarning.value = true
+            return
+        }
         _editingPlan.value = null
         _editingTemplates.value = emptyList()
         _hiddenEditingTemplates.value = emptyList()
         _editingExercises.value = emptyMap()
+        _isCreatingNewPlan.value = false
+        _showEmptyPlanWarning.value = false
+    }
+
+    fun cancelPlanCreation() {
+        val plan = _editingPlan.value
+        if (plan != null && _isCreatingNewPlan.value) {
+            viewModelScope.launch {
+                db.workoutPlanDao().deletePlan(plan)
+                closeConstructor(force = true)
+            }
+        } else {
+            closeConstructor(force = true)
+        }
     }
 
     fun togglePlanVisibility(plan: Plan) {
         viewModelScope.launch {
-            if (plan.isActive) {
-                workoutRepository.archivePlan(plan)
-            } else {
-                workoutRepository.restorePlan(plan)
-            }
+            if (plan.isActive) workoutRepository.archivePlan(plan)
+            else workoutRepository.restorePlan(plan)
         }
     }
 }
