@@ -93,6 +93,15 @@ class DatabaseSeeder(
                     duration = seedExercise.duration,
                     order = exerciseIndex + 1,
                     trainingMode = seedExercise.trainingMode,
+                    periodizationEnabled = seedExercise.periodizationEnabled,
+                    modeA = seedExercise.modeA,
+                    modeB = seedExercise.modeB,
+                    setsA = seedExercise.setsA,
+                    repsA = seedExercise.repsA,
+                    weightA = seedExercise.weightA,
+                    setsB = seedExercise.setsB,
+                    repsB = seedExercise.repsB,
+                    weightB = seedExercise.weightB,
                 )
             )
         }

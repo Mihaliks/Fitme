@@ -8,6 +8,7 @@ enum class MuscleGroup {
 
     // BACK
     LATS, // широчайшие мышцы спины
+    MID_BACK, // средняя часть спины (объем спины)
     TRAPS, // трапециевидные мышцы
     LOWER_BACK, // поясница (разгибатели спины)
 
@@ -20,7 +21,7 @@ enum class MuscleGroup {
     BICEPS, // бицепс
     BRACHIALIS, // брахиалис
     TRICEPS, // трицепс
-    FOREARM, // предплечья
+    FOREARMS, // предплечья
 
     // CORE
     ABS, // пресс
