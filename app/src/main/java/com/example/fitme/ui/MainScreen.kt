@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -24,26 +25,26 @@ fun MainScreen() {
     val context = LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences("fitme_prefs", Context.MODE_PRIVATE) }
 
-    var isFirstLaunch by remember { 
+    val isFirstLaunch = remember { 
         mutableStateOf(sharedPreferences.getBoolean("is_first_launch", true)) 
     }
 
-    val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    if (isFirstLaunch) {
+    if (isFirstLaunch.value) {
         WelcomeScreen(onStartClick = {
-            isFirstLaunch = false
-            sharedPreferences.edit().putBoolean("is_first_launch", false).apply()
+            sharedPreferences.edit { putBoolean("is_first_launch", false) }
+            isFirstLaunch.value = false
         })
     } else {
+        val navController = rememberNavController()
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
+
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text("FitMe") },
                     actions = {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             if (currentRoute == Screen.Settings.route) {
                                 navController.navigate(Screen.Progress.route) {
                                     popUpTo(Screen.Progress.route) { inclusive = false }

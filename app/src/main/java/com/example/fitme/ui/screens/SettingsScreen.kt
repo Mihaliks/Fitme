@@ -1,7 +1,6 @@
 package com.example.fitme.ui.screens
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,8 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.fitme.ui.theme.ColorVariant
 import com.example.fitme.ui.theme.ThemeMode
@@ -79,8 +78,8 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:")
-                            putExtra(Intent.EXTRA_EMAIL, arrayOf("сюда вписать почту"))
+                            data = "mailto:".toUri()
+                            putExtra(Intent.EXTRA_EMAIL, arrayOf("support@example.com"))
                             putExtra(Intent.EXTRA_SUBJECT, "FitMe Feedback")
                         }
                         context.startActivity(Intent.createChooser(intent, "Отправить письмо"))
