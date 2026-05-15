@@ -494,7 +494,16 @@ fun WorkoutConstructorScreen(onBack: () -> Unit, onNavigateToHidden: () -> Unit,
                 item { Text("Ваши планы", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                 if (activePlans.isEmpty()) item { Text("Нет активных планов", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(activePlans) { plan ->
-                    PlanListItem(plan, plan.id == activePlanId, false, { viewModel.loadPlanForEditing(plan.id) }, { viewModel.togglePlanVisibility(plan) }, { viewModel.startWorkout(plan.id) })
+                    val isActivePlan = plan.id == activePlanId
+                    PlanListItem(
+                        plan = plan,
+                        isActive = isActivePlan,
+                        isBuiltIn = false,
+                        onEdit = { viewModel.loadPlanForEditing(plan.id) },
+                        onHide = { viewModel.togglePlanVisibility(plan) },
+                        onStart = { viewModel.startWorkout(plan.id) },
+                        onSelect = { viewModel.selectPlanAsActive(if (isActivePlan) null else plan.id) }
+                    )
                 }
             }
         } else {
@@ -504,17 +513,32 @@ fun WorkoutConstructorScreen(onBack: () -> Unit, onNavigateToHidden: () -> Unit,
 }
 
 @Composable
-fun PlanListItem(plan: Plan, isActive: Boolean, isBuiltIn: Boolean, onEdit: () -> Unit, onHide: () -> Unit, onStart: () -> Unit = {}, isArchiveScreen: Boolean = false) {
+fun PlanListItem(plan: Plan, isActive: Boolean, isBuiltIn: Boolean, onEdit: () -> Unit, onHide: () -> Unit, onStart: () -> Unit = {}, isArchiveScreen: Boolean = false, onSelect: (() -> Unit)? = null) {
     Card(modifier = Modifier.fillMaxWidth().clickable { onEdit() }, shape = RoundedCornerShape(20.dp), colors = if (isActive) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else CardDefaults.cardColors()) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.AutoMirrored.Filled.Assignment, null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(plan.name, style = MaterialTheme.typography.titleMedium)
-                if (isBuiltIn) Text("Стандартный", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.AutoMirrored.Filled.Assignment, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(plan.name, style = MaterialTheme.typography.titleMedium)
+                    if (isBuiltIn) Text("Стандартный", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                }
+                if (!isArchiveScreen && !isBuiltIn) IconButton(onClick = onStart) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = onHide) { Icon(if (plan.isActive) Icons.Default.VisibilityOff else Icons.Default.Visibility, null) }
             }
-            if (!isArchiveScreen && !isBuiltIn) IconButton(onClick = onStart) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
-            IconButton(onClick = onHide) { Icon(if (plan.isActive) Icons.Default.VisibilityOff else Icons.Default.Visibility, null) }
+            if (onSelect != null && !isBuiltIn && !isArchiveScreen) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onSelect,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = if (isActive) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonColors()
+                ) {
+                    Icon(if (isActive) Icons.Default.Close else Icons.Default.Check, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (isActive) "Перестать следовать" else "Выбрать план")
+                }
+            }
         }
     }
 }

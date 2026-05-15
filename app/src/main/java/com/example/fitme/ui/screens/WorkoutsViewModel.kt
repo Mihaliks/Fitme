@@ -13,6 +13,7 @@ import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
 import com.example.fitme.data.models.NextWorkoutPlan
+import com.example.fitme.data.models.NextWorkoutPreview
 import com.example.fitme.data.repositories.ExerciseRepository
 import com.example.fitme.data.repositories.UserRepository
 import com.example.fitme.data.repositories.WorkoutRepository
@@ -65,6 +66,9 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     val activePlanId: StateFlow<Int?> = userRepository.observeActivePlan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    private val _nextWorkoutPreview = MutableStateFlow<NextWorkoutPreview?>(null)
+    val nextWorkoutPreview: StateFlow<NextWorkoutPreview?> = _nextWorkoutPreview.asStateFlow()
 
     private val _selectedPlan = MutableStateFlow<Plan?>(null)
     val selectedPlan: StateFlow<Plan?> = _selectedPlan.asStateFlow()
@@ -130,6 +134,16 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     init {
         viewModelScope.launch {
             exerciseRepository.getAllActiveExercises().collect { _allExercises.value = it }
+        }
+        viewModelScope.launch {
+            activePlanId.collectLatest { planId ->
+                if (planId != null) {
+                    val preview = workoutRepository.peekNextWorkoutSession(planId)
+                    _nextWorkoutPreview.value = preview
+                } else {
+                    _nextWorkoutPreview.value = null
+                }
+            }
         }
     }
 
