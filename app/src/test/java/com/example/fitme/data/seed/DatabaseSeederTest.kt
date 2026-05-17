@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.fitme.data.AppDatabase
+import com.example.fitme.data.entities.enums.TrainingMode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -57,19 +58,49 @@ class DatabaseSeederTest {
         assertTrue(builtInTemplates.all { it.isBuiltIn })
         assertTrue(builtInTemplates.all { it.planId == null })
 
+        val upperLowerPlan = plans.first { it.name == "Верх / низ" }
+        val upperLowerTemplates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(upperLowerPlan.id)
+        assertEquals(
+            listOf(
+                "Верх A - грудь и руки",
+                "Низ A - ноги и плечи",
+                "Верх B - спина и руки",
+                "Низ B - ноги и задние дельты",
+            ),
+            upperLowerTemplates.map { it.name },
+        )
+
         val fullBodyPlan = plans.first { it.name == "Фулбади для новичка" }
         val fullBodyTemplates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(fullBodyPlan.id)
-        assertEquals(listOf("Фулбади A", "Фулбади B"), fullBodyTemplates.map { it.name })
-        assertEquals(listOf(1, 2), fullBodyTemplates.map { it.order })
-        assertEquals(listOf(false, false), fullBodyTemplates.map { it.isBuiltIn })
+        assertEquals(
+            listOf("Фулбади для новичка"),
+            fullBodyTemplates.map { it.name },
+        )
+        assertEquals(listOf(1), fullBodyTemplates.map { it.order })
+        assertEquals(listOf(false), fullBodyTemplates.map { it.isBuiltIn })
 
         val firstTemplateExercises = db.exerciseToDoDao()
             .getExerciseDetailsForWorkoutOnce(fullBodyTemplates.first().id)
         assertEquals(
-            listOf("Приседания со штангой", "Жим лежа", "Тяга штанги в наклоне", "Планка"),
+            listOf(
+                "Жим ногами",
+                "Сгибание ног лежа",
+                "Жим гантелей на наклонной скамье",
+                "Тяга верхнего блока",
+                "Подъем гантелей в стороны",
+                "Планка",
+            ),
             firstTemplateExercises.map { it.exercise.name },
         )
-        assertEquals(listOf(1, 2, 3, 4), firstTemplateExercises.map { it.exerciseToDo.order })
+        assertEquals(listOf(1, 2, 3, 4, 5, 6), firstTemplateExercises.map { it.exerciseToDo.order })
+
+        val legPress = firstTemplateExercises.first().exerciseToDo
+        assertEquals(true, legPress.periodizationEnabled)
+        assertEquals(TrainingMode.HYPERTROPHY, legPress.trainingMode)
+        assertEquals(TrainingMode.HYPERTROPHY, legPress.modeA)
+        assertEquals(TrainingMode.ENDURANCE, legPress.modeB)
+        assertEquals(10, legPress.repsA)
+        assertEquals(18, legPress.repsB)
     }
 
     @Test
