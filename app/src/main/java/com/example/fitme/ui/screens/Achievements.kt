@@ -28,8 +28,6 @@ data class Achievement(
 fun calculateAchievements(history: List<HistoryItem>): List<Achievement> {
     val workoutCount = history.size
     val maxDuration = history.maxOfOrNull { it.session.totalDuration ?: 0 } ?: 0
-
-    // Расчет серии тренировок без пропусков (в днях)
     val sortedDates = history.map { it.session.date }.sortedDescending().distinct()
     var maxStreak = if (sortedDates.isNotEmpty()) 1 else 0
     var currentStreak = maxStreak
@@ -112,7 +110,6 @@ fun AchievementsSection(history: List<HistoryItem>) {
                         AchievementCard(achievement)
                     }
                 }
-                // Fill empty space if odd number
                 if (rowItems.size == 1) {
                     Spacer(modifier = Modifier.weight(1f))
                 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import java.time.LocalTime
 
 @Composable
 fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
@@ -25,6 +26,7 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
     val builtInPlans by viewModel.filteredPlans.collectAsState()
     val currentSession by viewModel.currentSession.collectAsState()
     val history by viewModel.workoutHistory.collectAsState()
+    val user by viewModel.user.collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadHistory()
@@ -38,6 +40,15 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
     val activePlan = plans.find { it.id == activePlanId } ?: builtInPlans.find { it.id == activePlanId }
     val nextWorkoutPreview by viewModel.nextWorkoutPreview.collectAsState()
 
+    val greeting = when (LocalTime.now().hour) {
+        in 6..11 -> "Доброе утро"
+        in 12..17 -> "Добрый день"
+        in 18..23 -> "Добрый вечер"
+        else -> "Доброй ночи"
+    }
+    val userName = user?.name ?: ""
+    val welcomeText = if (userName.isNotEmpty()) "$greeting, $userName!" else "$greeting!"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -45,22 +56,30 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
             Text(
-                text = "Ваш Прогресс",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                text = welcomeText,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
             )
-            IconButton(onClick = onNavigateToHistory) {
-                Icon(
-                    imageVector = Icons.Default.History,
-                    contentDescription = "История тренировок",
-                    tint = MaterialTheme.colorScheme.primary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Ваш Прогресс",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
                 )
+                IconButton(onClick = onNavigateToHistory) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = "История тренировок",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
 

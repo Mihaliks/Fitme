@@ -54,7 +54,6 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
             )
         }
 
-        // History List
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -112,7 +111,6 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
             }
         }
 
-        // Next Workout Preview
         if (activePlanId != null && nextWorkoutPreview != null) {
             Spacer(modifier = Modifier.height(16.dp))
             Card(

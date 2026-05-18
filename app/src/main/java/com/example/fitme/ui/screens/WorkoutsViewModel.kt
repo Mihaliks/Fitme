@@ -8,6 +8,7 @@ import com.example.fitme.data.AppDatabase
 import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Plan
+import com.example.fitme.data.entities.User
 import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
@@ -75,6 +76,9 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     val activePlanId: StateFlow<Int?> = userRepository.observeActivePlan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    private val _user = MutableStateFlow<User?>(null)
+    val user = _user.asStateFlow()
 
     private val _nextWorkoutPreview = MutableStateFlow<NextWorkoutPreview?>(null)
     val nextWorkoutPreview: StateFlow<NextWorkoutPreview?> = _nextWorkoutPreview.asStateFlow()
@@ -149,6 +153,9 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private var workoutStartTime: Long = 0L
 
     init {
+        viewModelScope.launch {
+            _user.value = userRepository.getUser()
+        }
         viewModelScope.launch {
             exerciseRepository.getAllActiveExercises().collect { _allExercises.value = it }
         }
