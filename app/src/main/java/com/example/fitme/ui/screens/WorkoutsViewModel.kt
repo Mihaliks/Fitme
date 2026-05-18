@@ -8,17 +8,28 @@ import com.example.fitme.data.AppDatabase
 import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Plan
+import com.example.fitme.data.entities.User
+import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
 import com.example.fitme.data.models.NextWorkoutPlan
+import com.example.fitme.data.models.NextWorkoutPreview
 import com.example.fitme.data.repositories.ExerciseRepository
 import com.example.fitme.data.repositories.UserRepository
 import com.example.fitme.data.repositories.WorkoutRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import androidx.sqlite.db.SimpleSQLiteQuery
+import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+
+data class HistoryItem(
+    val session: WorkoutSession,
+    val templateName: String
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkoutsViewModel(application: Application) : AndroidViewModel(application) {
@@ -65,6 +76,12 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     val activePlanId: StateFlow<Int?> = userRepository.observeActivePlan()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    private val _user = MutableStateFlow<User?>(null)
+    val user = _user.asStateFlow()
+
+    private val _nextWorkoutPreview = MutableStateFlow<NextWorkoutPreview?>(null)
+    val nextWorkoutPreview: StateFlow<NextWorkoutPreview?> = _nextWorkoutPreview.asStateFlow()
 
     private val _selectedPlan = MutableStateFlow<Plan?>(null)
     val selectedPlan: StateFlow<Plan?> = _selectedPlan.asStateFlow()
@@ -127,15 +144,108 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     private val _hiddenTemplateIds = MutableStateFlow<Set<Int>>(loadHiddenTemplateIds())
 
+    private val _skippedSessionIds = MutableStateFlow<Set<Int>>(emptySet())
+    val skippedSessionIds: StateFlow<Set<Int>> = _skippedSessionIds.asStateFlow()
+
+    private val _workoutHistory = MutableStateFlow<List<HistoryItem>>(emptyList())
+    val workoutHistory: StateFlow<List<HistoryItem>> = _workoutHistory.asStateFlow()
+
+    private var workoutStartTime: Long = 0L
+
     init {
         viewModelScope.launch {
+            _user.value = userRepository.getUser()
+        }
+        viewModelScope.launch {
             exerciseRepository.getAllActiveExercises().collect { _allExercises.value = it }
+        }
+        viewModelScope.launch {
+            _skippedSessionIds.value = prefs.getStringSet("skipped_sessions", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+        }
+        viewModelScope.launch {
+            activePlanId.collectLatest { planId ->
+                if (planId != null) {
+                    val preview = workoutRepository.peekNextWorkoutSession(planId)
+                    _nextWorkoutPreview.value = preview
+                } else {
+                    _nextWorkoutPreview.value = null
+                }
+            }
         }
     }
 
     private fun loadHiddenTemplateIds(): Set<Int> {
         return prefs.getStringSet("hidden_template_ids", emptySet())
             ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+    }
+
+    fun loadHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val query = """
+                SELECT ws.id, ws.workout_template_id, ws.date, ws.total_duration, wt.name 
+                FROM workout_sessions ws 
+                LEFT JOIN workout_templates wt ON wt.id = ws.workout_template_id 
+                ORDER BY ws.date DESC, ws.id DESC
+            """.trimIndent()
+
+            val cursor = db.query(SimpleSQLiteQuery(query))
+            val list = mutableListOf<HistoryItem>()
+            val dateCol = cursor.getColumnIndex("date")
+            val nameCol = cursor.getColumnIndex("name")
+            val durCol = cursor.getColumnIndex("total_duration")
+            val idCol = cursor.getColumnIndex("id")
+            val templateIdCol = cursor.getColumnIndex("workout_template_id")
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getInt(idCol)
+                val templateId = if (cursor.isNull(templateIdCol)) null else cursor.getInt(templateIdCol)
+                // SQLite dates are long timestamps sometimes? Let's check converters later! Wait! Room stores LocalDate as String or Long depending on DateConverter.
+                // Let's assume Room uses DateConverter "java.time.LocalDate.toString()" based on usual practices.
+                val dateString = cursor.getString(dateCol)
+                val duration = if (cursor.isNull(durCol)) null else cursor.getInt(durCol)
+                val templateName = if (nameCol >= 0 && !cursor.isNull(nameCol)) cursor.getString(nameCol) else "Неизвестная тренировка"
+
+                try {
+                    val date = if (dateString != null && dateString.contains("-")) {
+                        LocalDate.parse(dateString)
+                    } else if (dateString != null) {
+                        try { LocalDate.ofEpochDay(dateString.toLong()) } catch(e: Exception) { LocalDate.now() }
+                    } else {
+                        LocalDate.now()
+                    }
+                    val session = WorkoutSession(id, templateId, date, duration)
+                    list.add(HistoryItem(session, templateName))
+                } catch(e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            cursor.close()
+            _workoutHistory.value = list
+        }
+    }
+
+    fun markWorkoutSkipped(planId: Int) {
+        viewModelScope.launch {
+            val session = workoutRepository.createNextWorkoutSession(planId)
+            if (session != null) {
+                val current = _skippedSessionIds.value.toMutableSet()
+                current.add(session.sessionId)
+                _skippedSessionIds.value = current
+                prefs.edit().putStringSet("skipped_sessions", current.map { it.toString() }.toSet()).apply()
+                _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
+                loadHistory()
+            }
+        }
+    }
+
+    fun markWorkoutVisited(planId: Int) {
+        viewModelScope.launch {
+            val session = workoutRepository.createNextWorkoutSession(planId)
+            if (session != null) {
+                _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
+                loadHistory()
+            }
+        }
     }
 
     private fun saveHiddenTemplateIds(ids: Set<Int>) {
@@ -170,6 +280,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _currentSession.value = workoutRepository.createNextWorkoutSession(planId)
             _currentExerciseIndex.value = 0
+            workoutStartTime = System.currentTimeMillis()
         }
     }
 
@@ -179,6 +290,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
             if (session != null) {
                 _currentSession.value = session
                 _currentExerciseIndex.value = 0
+                workoutStartTime = System.currentTimeMillis()
             }
         }
     }
@@ -191,8 +303,26 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
 
     fun finishSession() {
+        val sessionId = _currentSession.value?.sessionId
+        val durationMinutes = if (workoutStartTime > 0) ((System.currentTimeMillis() - workoutStartTime) / 60000).toInt() else 0
+
         _currentSession.value = null
         _currentExerciseIndex.value = 0
+        workoutStartTime = 0L
+
+        viewModelScope.launch {
+            if (sessionId != null) {
+                val session = db.workoutSessionDao().getWorkoutSessionById(sessionId)
+                if (session != null) {
+                    db.workoutSessionDao().updateWorkoutSession(session.copy(totalDuration = durationMinutes))
+                }
+                loadHistory()
+            }
+            val planId = activePlanId.value
+            if (planId != null) {
+                _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
+            }
+        }
     }
 
     fun selectPlanAsActive(planId: Int?) { viewModelScope.launch { userRepository.setActivePlan(planId) } }

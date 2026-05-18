@@ -2,6 +2,7 @@ package com.example.fitme.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -9,6 +10,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 sealed class Screen (val route: String, val title: String, val icon: ImageVector? = null) {
     object Workouts : Screen("workouts", "Workouts", Icons.Default.FitnessCenter)
     object Progress : Screen("progress", "Progress", Icons.AutoMirrored.Default.ShowChart)
+    object WorkoutHistory : Screen("workoutHistory", "History", Icons.Default.History)
     object Settings : Screen("settings", "Settings", Icons.Default.Settings)
 
     object Welcome : Screen("welcome", "Welcome")
