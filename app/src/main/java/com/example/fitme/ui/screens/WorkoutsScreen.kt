@@ -22,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.fitme.data.entities.Exercise
@@ -30,6 +29,7 @@ import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
 import com.example.fitme.data.entities.enums.MuscleGroup
+import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
 
 
@@ -272,6 +272,14 @@ fun MuscleGroup.toRussian(): String = when (this) {
     MuscleGroup.GLUTE_MAXIMUS -> "Большая ягодичная"; MuscleGroup.GLUTE_MEDIUS -> "Средняя ягодичная"; MuscleGroup.GLUTE_MINIMUS -> "Малая ягодичная"
     MuscleGroup.QUADS -> "Квадрицепс"; MuscleGroup.HAMSTRINGS -> "Бицепс бедра"; MuscleGroup.ADDUCTORS -> "Приводящие"
     MuscleGroup.CALVES -> "Икры"; MuscleGroup.CARDIO -> "Кардио"; MuscleGroup.FULL_BODY -> "Все тело"; MuscleGroup.OTHER -> "Другое"
+}
+
+fun TrainingMode.toRussian(): String = when (this) {
+    TrainingMode.STRENGTH -> "Сила"
+    TrainingMode.HYPERTROPHY -> "Гипертрофия"
+    TrainingMode.ENDURANCE -> "Выносливость"
+    TrainingMode.NONE -> "Без режима"
+    TrainingMode.CUSTOM -> "Своя схема"
 }
 
 @Composable

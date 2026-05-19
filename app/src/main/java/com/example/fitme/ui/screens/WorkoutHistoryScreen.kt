@@ -96,7 +96,7 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     item.performedExercises.take(5).forEach { ex ->
                                         Text(
-                                            text = "${ex.name}: ${ex.actualSets} x ${ex.actualReps} (план: ${ex.plannedSets} x ${ex.plannedReps})",
+                                            text = "${ex.name}: ${ex.actualSets} x ${ex.actualReps}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

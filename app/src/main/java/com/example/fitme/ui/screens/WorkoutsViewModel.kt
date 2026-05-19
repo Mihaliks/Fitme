@@ -3,6 +3,7 @@ package com.example.fitme.ui.screens
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.core.content.edit
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingSource
 import com.example.fitme.data.AppDatabase
@@ -18,6 +19,7 @@ import com.example.fitme.data.entities.relations.ExerciseWithDetails
 import com.example.fitme.data.models.NextWorkoutPlan
 import com.example.fitme.data.models.NextWorkoutPreview
 import com.example.fitme.data.repositories.ExerciseRepository
+import com.example.fitme.data.repositories.NoteRepository
 import com.example.fitme.data.repositories.UserRepository
 import com.example.fitme.data.repositories.WorkoutRepository
 import com.example.fitme.data.seed.DefaultSeedData
@@ -48,6 +50,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val userRepository = UserRepository(db.userDao())
     private val exerciseRepository = ExerciseRepository(db.exerciseDao())
     private val prefs = application.getSharedPreferences("workout_ui_prefs", Context.MODE_PRIVATE)
+    private val periodizationDisplayEnabledKey = "periodization_display_enabled"
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -105,7 +108,16 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     val templateExercises: StateFlow<Map<Int, List<ExerciseWithDetails>>> = _templateExercises.asStateFlow()
 
     private val _currentSession = MutableStateFlow<NextWorkoutPlan?>(null)
-    val currentSession = _currentSession.asStateFlow()
+    private val _periodizationDisplayEnabled = MutableStateFlow(
+         prefs.getBoolean(periodizationDisplayEnabledKey, true)
+     )
+     val periodizationDisplayEnabled: StateFlow<Boolean> = _periodizationDisplayEnabled.asStateFlow()
+
+     private val _planPeriodizationMode = MutableStateFlow<Map<Int, String>>(loadPlanPeriodizationModes())
+
+    val currentSession: StateFlow<NextWorkoutPlan?> = combine(_currentSession, periodizationDisplayEnabled) { session, enabled ->
+        if (enabled) session else session?.let { transformSessionForDisabledPeriodization(it) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _currentExerciseIndex = MutableStateFlow(0)
     val currentExerciseIndex = _currentExerciseIndex.asStateFlow()
@@ -165,6 +177,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val _recentHistory = MutableStateFlow<List<HistoryItem>>(emptyList())
 
     private var workoutStartTime: Long = 0L
+    private val noteDao = db.noteDao()
 
     init {
         viewModelScope.launch {
@@ -188,10 +201,59 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun loadHiddenTemplateIds(): Set<Int> {
-        return prefs.getStringSet("hidden_template_ids", emptySet())
-            ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+    fun setPeriodizationDisplayEnabled(enabled: Boolean) {
+        _periodizationDisplayEnabled.value = enabled
+        prefs.edit().putBoolean(periodizationDisplayEnabledKey, enabled).apply()
     }
+
+    private fun transformSessionForDisabledPeriodization(session: NextWorkoutPlan): NextWorkoutPlan {
+        val transformedExercises = session.exercises.map { exercise ->
+            val exerciseToDo = exercise.exerciseToDo
+            if (!exerciseToDo.periodizationEnabled) {
+                exercise
+            } else {
+                exercise.copy(
+                    chosenMode = exerciseToDo.trainingMode,
+                )
+            }
+        }
+
+        return session.copy(exercises = transformedExercises)
+    }
+
+    private fun loadHiddenTemplateIds(): Set<Int> {
+         return prefs.getStringSet("hidden_template_ids", emptySet())
+             ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+     }
+
+     private fun loadPlanPeriodizationModes(): Map<Int, String> {
+         val modeString = prefs.getString("plan_periodization_modes", "") ?: ""
+         if (modeString.isEmpty()) return emptyMap()
+         return modeString.split("|").mapNotNull {
+             val parts = it.split(":")
+             if (parts.size == 2) parts[0].toIntOrNull()?.let { planId -> planId to parts[1] } else null
+         }.toMap()
+     }
+
+     private fun savePlanPeriodizationMode(planId: Int, mode: String) {
+         val current = _planPeriodizationMode.value.toMutableMap()
+         current[planId] = mode
+         _planPeriodizationMode.value = current
+         val modeString = current.map { "${it.key}:${it.value}" }.joinToString("|")
+         prefs.edit {
+             putString("plan_periodization_modes", modeString)
+         }
+     }
+
+     private fun getPlanPeriodizationMode(planId: Int): String {
+         return _planPeriodizationMode.value[planId] ?: "A"
+     }
+
+     private fun togglePlanPeriodizationMode(planId: Int) {
+         val currentMode = getPlanPeriodizationMode(planId)
+         val newMode = if (currentMode == "A") "B" else "A"
+         savePlanPeriodizationMode(planId, newMode)
+     }
 
     fun loadHistory() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -200,46 +262,70 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private suspend fun loadHistoryItems(): List<HistoryItem> {
-        val workoutSessionDao = db.workoutSessionDao()
-        val workoutPlanDao = db.workoutPlanDao()
-        val sessions = mutableListOf<WorkoutSession>()
-        val pagingSource: PagingSource<Int, WorkoutSession> = workoutSessionDao.getAllWorkoutSessions()
-        var key: Int? = null
+     private suspend fun loadHistoryItems(): List<HistoryItem> {
+         val workoutSessionDao = db.workoutSessionDao()
+         val workoutPlanDao = db.workoutPlanDao()
+         val exerciseToDoDao = db.exerciseToDoDao()
+         val noteRepository = NoteRepository(db)
+         val sessions = mutableListOf<WorkoutSession>()
+         val pagingSource: PagingSource<Int, WorkoutSession> = workoutSessionDao.getAllWorkoutSessions()
+         var key: Int? = null
 
-        while (true) {
-            val params: PagingSource.LoadParams<Int> = if (key == null) {
-                PagingSource.LoadParams.Refresh(
-                    key = null,
-                    loadSize = HISTORY_PAGE_SIZE,
-                    placeholdersEnabled = false,
-                )
-            } else {
-                PagingSource.LoadParams.Append(
-                    key = key,
-                    loadSize = HISTORY_PAGE_SIZE,
-                    placeholdersEnabled = false,
-                )
-            }
+         while (true) {
+             val params: PagingSource.LoadParams<Int> = if (key == null) {
+                 PagingSource.LoadParams.Refresh(
+                     key = null,
+                     loadSize = HISTORY_PAGE_SIZE,
+                     placeholdersEnabled = false,
+                 )
+             } else {
+                 PagingSource.LoadParams.Append(
+                     key = key,
+                     loadSize = HISTORY_PAGE_SIZE,
+                     placeholdersEnabled = false,
+                 )
+             }
 
-            when (val result = pagingSource.load(params)) {
-                is PagingSource.LoadResult.Page -> {
-                    sessions += result.data
-                    key = result.nextKey ?: break
-                }
+             when (val result = pagingSource.load(params)) {
+                 is PagingSource.LoadResult.Page -> {
+                     sessions += result.data
+                     key = result.nextKey ?: break
+                 }
 
-                is PagingSource.LoadResult.Error -> throw result.throwable
-                is PagingSource.LoadResult.Invalid -> break
-            }
-        }
+                 is PagingSource.LoadResult.Error -> throw result.throwable
+                 is PagingSource.LoadResult.Invalid -> break
+             }
+         }
 
-        return sessions.map { session ->
-            val templateName = session.workoutTemplateId
-                ?.let { workoutPlanDao.getWorkoutTemplateById(it)?.name }
-                ?: "Неизвестная тренировка"
-            HistoryItem(session = session, templateName = templateName)
-        }
-    }
+         return sessions.map { session ->
+             val templateName = session.workoutTemplateId
+                 ?.let { workoutPlanDao.getWorkoutTemplateById(it)?.name }
+                 ?: "Неизвестная тренировка"
+
+             // Восстанавливаем информацию о выполненных упражнениях из Notes
+             val performedExercises = if (session.workoutTemplateId != null) {
+                 val exercises = exerciseToDoDao.getExerciseDetailsForWorkoutOnce(session.workoutTemplateId)
+                 exercises.map { detail ->
+                     val notes = noteRepository.getNotesForExerciseInSessionOnce(
+                         workoutSessionId = session.id,
+                         exerciseToDoId = detail.exerciseToDo.id
+                     )
+                     PerformedExercise(
+                         name = detail.exercise.name,
+                         plannedSets = detail.exerciseToDo.sets,
+                         plannedReps = detail.exerciseToDo.reps,
+                         actualSets = if (notes.isEmpty()) detail.exerciseToDo.sets else notes.size,
+                         actualReps = notes.lastOrNull()?.reps ?: detail.exerciseToDo.reps,
+                         plannedWeight = detail.exerciseToDo.weight
+                     )
+                 }
+             } else {
+                 emptyList()
+             }
+
+             HistoryItem(session = session, templateName = templateName, performedExercises = performedExercises)
+         }
+     }
 
     private companion object {
         const val HISTORY_PAGE_SIZE = 50
@@ -298,23 +384,64 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun selectRegion(region: BodyRegion?) { _selectedRegion.value = region }
 
     fun startWorkout(planId: Int) {
-        viewModelScope.launch {
-            _currentSession.value = workoutRepository.createNextWorkoutSession(planId)
-            _currentExerciseIndex.value = 0
-            workoutStartTime = System.currentTimeMillis()
-        }
-    }
+         viewModelScope.launch {
+             var session = workoutRepository.createNextWorkoutSession(planId)
+             if (session != null) {
+                 session = applyPlanPeriodizationMode(session, planId)
+                 _currentSession.value = session
+                 _currentExerciseIndex.value = 0
+                 workoutStartTime = System.currentTimeMillis()
+             }
+         }
+     }
 
-    fun startWorkoutFromTemplate(templateId: Int) {
-        viewModelScope.launch {
-            val session = workoutRepository.createWorkoutSessionFromTemplate(templateId)
-            if (session != null) {
-                _currentSession.value = session
-                _currentExerciseIndex.value = 0
-                workoutStartTime = System.currentTimeMillis()
-            }
-        }
-    }
+     fun startWorkoutFromTemplate(templateId: Int) {
+         viewModelScope.launch {
+             val session = workoutRepository.createWorkoutSessionFromTemplate(templateId)
+             if (session != null) {
+                 _currentSession.value = session
+                 _currentExerciseIndex.value = 0
+                 workoutStartTime = System.currentTimeMillis()
+             }
+         }
+     }
+
+     private suspend fun applyPlanPeriodizationMode(session: NextWorkoutPlan, planId: Int): NextWorkoutPlan {
+         val mode = getPlanPeriodizationMode(planId)
+         val transformedExercises = session.exercises.map { exercise ->
+             val exerciseToDo = exercise.exerciseToDo
+             if (!exerciseToDo.periodizationEnabled) {
+                 exercise
+             } else {
+                 val newMode = when (mode) {
+                     "A" -> exerciseToDo.modeA ?: exercise.chosenMode
+                     "B" -> exerciseToDo.modeB ?: exercise.chosenMode
+                     else -> exercise.chosenMode
+                 }
+                 val newParams = when (newMode) {
+                     exerciseToDo.modeA -> {
+                         exercise.copy(
+                             chosenMode = newMode,
+                             plannedSets = exerciseToDo.setsA ?: exercise.plannedSets,
+                             plannedReps = exerciseToDo.repsA ?: exercise.plannedReps,
+                             plannedWeight = exerciseToDo.weightA ?: exercise.plannedWeight
+                         )
+                     }
+                     exerciseToDo.modeB -> {
+                         exercise.copy(
+                             chosenMode = newMode,
+                             plannedSets = exerciseToDo.setsB ?: exercise.plannedSets,
+                             plannedReps = exerciseToDo.repsB ?: exercise.plannedReps,
+                             plannedWeight = exerciseToDo.weightB ?: exercise.plannedWeight
+                         )
+                     }
+                     else -> exercise
+                 }
+                 newParams
+             }
+         }
+         return session.copy(exercises = transformedExercises)
+     }
 
     fun nextExercise() {
         val session = _currentSession.value ?: return
@@ -323,49 +450,101 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
 
-    fun finishSession() {
-        val session = _currentSession.value
-        val sessionId = session?.sessionId
-        val durationMinutes = if (workoutStartTime > 0) ((System.currentTimeMillis() - workoutStartTime) / 60000).toInt() else 0
+     fun finishSession() {
+          val session = _currentSession.value
+          val sessionId = session?.sessionId
+          val durationMinutes = if (workoutStartTime > 0) ((System.currentTimeMillis() - workoutStartTime) / 60000).toInt() else 0
 
-        val performed = session?.exercises?.map { ex ->
-            PerformedExercise(
-                name = ex.exercise.name,
-                plannedSets = ex.plannedSets,
-                plannedReps = ex.plannedReps,
-                actualSets = ex.plannedSets,
-                actualReps = ex.plannedReps,
-                plannedWeight = ex.plannedWeight
-            )
-        } ?: emptyList()
+          val performed = run {
+              if (session == null) return@run emptyList<PerformedExercise>()
+              val list = mutableListOf<PerformedExercise>()
+              kotlinx.coroutines.runBlocking {
+                  for (ex in session.exercises) {
+                      val notes = noteDao.getNotesForExerciseInSessionOnce(session.sessionId, ex.exerciseToDo.id)
 
-        if (session != null) {
-            val templateName = session.template.name
-            val historyItem = HistoryItem(
-                session = WorkoutSession(id = session.sessionId, workoutTemplateId = session.template.id, date = java.time.LocalDate.now(), totalDuration = durationMinutes),
-                templateName = templateName,
-                performedExercises = performed
-            )
-            _recentHistory.value = listOf(historyItem) + _recentHistory.value
-        }
+                      val actualSets = if (notes.isEmpty()) ex.plannedSets else notes.size
+                      val actualReps = notes.lastOrNull()?.reps ?: ex.plannedReps
+                      list += PerformedExercise(
+                          name = ex.exercise.name,
+                          plannedSets = ex.plannedSets,
+                          plannedReps = ex.plannedReps,
+                          actualSets = actualSets,
+                          actualReps = actualReps,
+                          plannedWeight = ex.plannedWeight
+                      )
+                  }
+              }
+              list
+          }
 
-        _currentSession.value = null
-        _currentExerciseIndex.value = 0
-        workoutStartTime = 0L
+          if (session != null) {
+              val templateName = session.template.name
+              val historyItem = HistoryItem(
+                  session = WorkoutSession(id = session.sessionId, workoutTemplateId = session.template.id, date = java.time.LocalDate.now(), totalDuration = durationMinutes),
+                  templateName = templateName,
+                  performedExercises = performed
+              )
+              _recentHistory.value = listOf(historyItem) + _recentHistory.value
+          }
 
+          _currentSession.value = null
+          _currentExerciseIndex.value = 0
+          workoutStartTime = 0L
+
+          viewModelScope.launch {
+              if (sessionId != null) {
+                  val dbSession = db.workoutSessionDao().getWorkoutSessionById(sessionId)
+                  if (dbSession != null) {
+                      db.workoutSessionDao().updateWorkoutSession(dbSession.copy(totalDuration = durationMinutes))
+                  }
+              }
+
+               val planId = activePlanId.value
+               if (planId != null && session != null) {
+                   checkAndTogglePeriodizationIfCycleComplete(planId, session.template.id)
+               }
+
+               loadHistory()
+               activePlanId.value?.let { planId ->
+                   _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
+               }
+          }
+      }
+
+     private suspend fun checkAndTogglePeriodizationIfCycleComplete(planId: Int, currentTemplateId: Int) {
+         val plan = db.workoutPlanDao().getPlanById(planId) ?: return
+         val templates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(planId)
+         if (templates.isEmpty()) return
+         val currentTemplate = templates.find { it.id == currentTemplateId } ?: return
+         val isLastTemplate = currentTemplate.order == templates.maxOf { it.order }
+
+         if (isLastTemplate) {
+             togglePlanPeriodizationMode(planId)
+         }
+     }
+
+    fun appendNoteForCurrentExercise(reps: Int? = null, weight: Double? = null, duration: Int? = null) {
+        val session = _currentSession.value ?: return
+        val index = _currentExerciseIndex.value
+        val exercise = session.exercises.getOrNull(index) ?: return
         viewModelScope.launch {
-            if (sessionId != null) {
-                val dbSession = db.workoutSessionDao().getWorkoutSessionById(sessionId)
-                if (dbSession != null) {
-                    db.workoutSessionDao().updateWorkoutSession(dbSession.copy(totalDuration = durationMinutes))
-                }
-            }
-            loadHistory()
-            val planId = activePlanId.value
-            if (planId != null) {
-                _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
-            }
+            val noteRepo = com.example.fitme.data.repositories.NoteRepository(db)
+            noteRepo.appendNote(
+                workoutSessionId = session.sessionId,
+                exerciseToDoId = exercise.exerciseToDo.id,
+                modeUsed = exercise.chosenMode,
+                reps = reps,
+                weight = weight,
+                duration = duration
+            )
         }
+    }
+
+    fun observeNotesForCurrentExercise(): kotlinx.coroutines.flow.Flow<List<com.example.fitme.data.entities.Note>> {
+        val session = _currentSession.value ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        val index = _currentExerciseIndex.value
+        val exercise = session.exercises.getOrNull(index) ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return noteDao.getNotesForExerciseInSession(session.sessionId, exercise.exerciseToDo.id)
     }
 
     fun updateCurrentExercisePlanned(index: Int, sets: Int, reps: Int) {

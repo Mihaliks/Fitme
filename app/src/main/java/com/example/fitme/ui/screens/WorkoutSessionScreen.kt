@@ -1,7 +1,6 @@
 package com.example.fitme.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +28,7 @@ fun WorkoutSessionScreen(
 ) {
     val session by viewModel.currentSession.collectAsState()
     val currentIndex by viewModel.currentExerciseIndex.collectAsState()
+    val periodizationDisplayEnabled by viewModel.periodizationDisplayEnabled.collectAsState()
 
     val currentSession = session ?: return
 
@@ -49,8 +49,6 @@ fun WorkoutSessionScreen(
         EditSetsRepsDialog(
             sets = editedSets,
             reps = editedReps,
-            onSetsChange = { editedSets = it },
-            onRepsChange = { editedReps = it },
             onConfirm = { sets, reps ->
                 viewModel.updateCurrentExercisePlanned(currentIndex, sets, reps)
                 showEditDialog = false
@@ -93,6 +91,36 @@ fun WorkoutSessionScreen(
         val exercise = currentSession.exercises.getOrNull(currentIndex)
 
         if (exercise != null) {
+            val exerciseToDo = exercise.exerciseToDo
+            val duration = exerciseToDo.duration
+            val isTimeBased = duration != null && duration > 0
+            val modeLabel = exercise.chosenMode.toRussian()
+            val muscleLabel = exercise.exercise.muscle?.toRussian() ?: "Не указана"
+
+            val displayedSets: Int = if (exerciseToDo.periodizationEnabled && periodizationDisplayEnabled) {
+                when (exercise.chosenMode) {
+                    exerciseToDo.modeA -> exerciseToDo.setsA ?: exercise.plannedSets
+                    exerciseToDo.modeB -> exerciseToDo.setsB ?: exercise.plannedSets
+                    else -> exercise.plannedSets
+                }
+            } else exercise.plannedSets
+
+            val displayedReps: Int = if (exerciseToDo.periodizationEnabled && periodizationDisplayEnabled) {
+                when (exercise.chosenMode) {
+                    exerciseToDo.modeA -> exerciseToDo.repsA ?: exercise.plannedReps
+                    exerciseToDo.modeB -> exerciseToDo.repsB ?: exercise.plannedReps
+                    else -> exercise.plannedReps
+                }
+            } else exercise.plannedReps
+
+            val displayedWeight: Double? = if (exerciseToDo.periodizationEnabled && periodizationDisplayEnabled) {
+                when (exercise.chosenMode) {
+                    exerciseToDo.modeA -> exerciseToDo.weightA ?: exercise.plannedWeight
+                    exerciseToDo.modeB -> exerciseToDo.weightB ?: exercise.plannedWeight
+                    else -> exercise.plannedWeight
+                }
+            } else exercise.plannedWeight
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -119,20 +147,71 @@ fun WorkoutSessionScreen(
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = TextAlign.Center
                     )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(12.dp)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = exercise.chosenMode.name,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "Режим: $modeLabel",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+
+                        if (exerciseToDo.periodizationEnabled) {
+                            Surface(
+                                color = if (periodizationDisplayEnabled) {
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = if (periodizationDisplayEnabled) {
+                                        "Периодизация включена"
+                                    } else {
+                                        "Периодизация скрыта"
+                                    },
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (periodizationDisplayEnabled) {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        DetailInfoCard(
+                            label = "Регион тела",
+                            value = exercise.exercise.bodyRegion.toRussian(),
+                            modifier = Modifier.weight(1f)
+                        )
+                        DetailInfoCard(
+                            label = "Группа мышц",
+                            value = muscleLabel,
+                            modifier = Modifier.weight(1f)
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Spacer(modifier = Modifier.height(48.dp))
 
@@ -140,17 +219,16 @@ fun WorkoutSessionScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatItem(label = "Подходы", value = exercise.plannedSets.toString())
-                        
-                        val duration = exercise.exerciseToDo.duration
-                        val isTimeBased = duration != null && duration > 0
+                        StatItem(label = "Подходы", value = displayedSets.toString())
+
                         StatItem(
                             label = if (isTimeBased) "Секунды" else "Повторы",
-                            value = if (isTimeBased) duration.toString() else exercise.plannedReps.toString()
+                            value = if (isTimeBased) duration.toString() else displayedReps.toString()
                         )
 
-                        if (exercise.plannedWeight != null) {
-                            StatItem(label = "Вес", value = "${exercise.plannedWeight} кг")
+
+                        if (displayedWeight != null) {
+                            StatItem(label = "Вес", value = "${displayedWeight} кг")
                         }
                     }
 
@@ -235,13 +313,41 @@ fun StatItem(label: String, value: String) {
     }
 }
 
+@Composable
+fun DetailInfoCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditSetsRepsDialog(
     sets: Int,
     reps: Int,
-    onSetsChange: (Int) -> Unit,
-    onRepsChange: (Int) -> Unit,
     onConfirm: (Int, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -282,9 +388,7 @@ fun EditSetsRepsDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    localSets.toIntOrNull()?.let { onSetsChange(it) }
-                    localReps.toIntOrNull()?.let { onRepsChange(it) }
-                    onConfirm(localSets.toInt(), localReps.toInt())
+                    onConfirm(localSets.toIntOrNull() ?: sets, localReps.toIntOrNull() ?: reps)
                     onDismiss()
                 }
             ) {
@@ -298,3 +402,5 @@ fun EditSetsRepsDialog(
         }
     )
 }
+
+

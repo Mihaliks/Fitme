@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
@@ -28,11 +29,15 @@ import com.example.fitme.ui.theme.ThemeMode
 
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = viewModel()
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
-    val themeMode by viewModel.themeMode.collectAsState()
-    val colorVariant by viewModel.colorVariant.collectAsState()
-    val user by viewModel.user.collectAsState()
+    val themeMode by settingsViewModel.themeMode.collectAsState()
+    val colorVariant by settingsViewModel.colorVariant.collectAsState()
+    val user by settingsViewModel.user.collectAsState()
+    val workoutsViewModel: WorkoutsViewModel = viewModel(
+        androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity
+    )
+    val periodizationDisplayEnabled by workoutsViewModel.periodizationDisplayEnabled.collectAsState()
     val context = LocalContext.current
 
     LazyColumn(
@@ -56,24 +61,24 @@ fun SettingsScreen(
                         EditableUserInfoField(
                             label = "Имя",
                             value = u.name,
-                            onSave = { viewModel.updateName(it) }
+                            onSave = { settingsViewModel.updateName(it) }
                         )
                         EditableUserInfoField(
                             label = "Возраст",
                             value = u.age.toString(),
-                            onSave = { it.toIntOrNull()?.let { age -> viewModel.updateAge(age) } },
+                            onSave = { it.toIntOrNull()?.let { age -> settingsViewModel.updateAge(age) } },
                             keyboardType = KeyboardType.Number
                         )
                         EditableUserInfoField(
                             label = "Вес (кг)",
                             value = u.weight.toString(),
-                            onSave = { it.toFloatOrNull()?.let { weight -> viewModel.updateWeight(weight) } },
+                            onSave = { it.toFloatOrNull()?.let { weight -> settingsViewModel.updateWeight(weight) } },
                             keyboardType = KeyboardType.Decimal
                         )
                         EditableUserInfoField(
                             label = "Рост (см)",
                             value = u.height.toString(),
-                            onSave = { it.toFloatOrNull()?.let { height -> viewModel.updateHeight(height) } },
+                            onSave = { it.toFloatOrNull()?.let { height -> settingsViewModel.updateHeight(height) } },
                             keyboardType = KeyboardType.Decimal
                         )
                     }
@@ -84,9 +89,9 @@ fun SettingsScreen(
         item {
             SettingsSection(title = "Тема оформления", icon = Icons.Default.SettingsBrightness) {
                 Column {
-                    ThemeModeOption("Системная", ThemeMode.SYSTEM, themeMode) { viewModel.setThemeMode(it) }
-                    ThemeModeOption("Светлая", ThemeMode.LIGHT, themeMode) { viewModel.setThemeMode(it) }
-                    ThemeModeOption("Тёмная", ThemeMode.DARK, themeMode) { viewModel.setThemeMode(it) }
+                        ThemeModeOption("Системная", ThemeMode.SYSTEM, themeMode) { settingsViewModel.setThemeMode(it) }
+                        ThemeModeOption("Светлая", ThemeMode.LIGHT, themeMode) { settingsViewModel.setThemeMode(it) }
+                        ThemeModeOption("Тёмная", ThemeMode.DARK, themeMode) { settingsViewModel.setThemeMode(it) }
                 }
             }
         }
@@ -99,10 +104,35 @@ fun SettingsScreen(
                         .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    ColorOption(Color(0xFF6650a4), ColorVariant.PURPLE, colorVariant) { viewModel.setColorVariant(it) }
-                    ColorOption(Color(0xFF3B7D64), ColorVariant.GREEN, colorVariant) { viewModel.setColorVariant(it) }
-                    ColorOption(Color(0xFF4361EE), ColorVariant.BLUE, colorVariant) { viewModel.setColorVariant(it) }
-                    ColorOption(Color(0xFFE76F51), ColorVariant.ORANGE, colorVariant) { viewModel.setColorVariant(it) }
+                    ColorOption(Color(0xFF6650a4), ColorVariant.PURPLE, colorVariant) { settingsViewModel.setColorVariant(it) }
+                    ColorOption(Color(0xFF3B7D64), ColorVariant.GREEN, colorVariant) { settingsViewModel.setColorVariant(it) }
+                    ColorOption(Color(0xFF4361EE), ColorVariant.BLUE, colorVariant) { settingsViewModel.setColorVariant(it) }
+                    ColorOption(Color(0xFFE76F51), ColorVariant.ORANGE, colorVariant) { settingsViewModel.setColorVariant(it) }
+                }
+            }
+        }
+
+        item {
+            SettingsSection(title = "Тренировка", icon = Icons.Default.FitnessCenter) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Показывать периодизацию",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Скрывает или показывает периодизированный режим в окне тренировки",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = periodizationDisplayEnabled,
+                        onCheckedChange = { workoutsViewModel.setPeriodizationDisplayEnabled(it) }
+                    )
                 }
             }
         }
