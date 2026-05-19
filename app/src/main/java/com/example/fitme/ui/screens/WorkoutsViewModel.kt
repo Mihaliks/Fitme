@@ -26,9 +26,19 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 
+data class PerformedExercise(
+    val name: String,
+    val plannedSets: Int,
+    val plannedReps: Int,
+    val actualSets: Int,
+    val actualReps: Int,
+    val plannedWeight: Double?
+)
+
 data class HistoryItem(
     val session: WorkoutSession,
-    val templateName: String
+    val templateName: String,
+    val performedExercises: List<PerformedExercise> = emptyList()
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -152,6 +162,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val _workoutHistory = MutableStateFlow<List<HistoryItem>>(emptyList())
     val workoutHistory: StateFlow<List<HistoryItem>> = _workoutHistory.asStateFlow()
 
+    private val _recentHistory = MutableStateFlow<List<HistoryItem>>(emptyList())
+
     private var workoutStartTime: Long = 0L
 
     init {
@@ -183,7 +195,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun loadHistory() {
         viewModelScope.launch(Dispatchers.IO) {
-            _workoutHistory.value = loadHistoryItems()
+            val dbItems = loadHistoryItems()
+            _workoutHistory.value = _recentHistory.value + dbItems
         }
     }
 
@@ -311,8 +324,30 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
 
     fun finishSession() {
-        val sessionId = _currentSession.value?.sessionId
+        val session = _currentSession.value
+        val sessionId = session?.sessionId
         val durationMinutes = if (workoutStartTime > 0) ((System.currentTimeMillis() - workoutStartTime) / 60000).toInt() else 0
+
+        val performed = session?.exercises?.map { ex ->
+            PerformedExercise(
+                name = ex.exercise.name,
+                plannedSets = ex.plannedSets,
+                plannedReps = ex.plannedReps,
+                actualSets = ex.plannedSets,
+                actualReps = ex.plannedReps,
+                plannedWeight = ex.plannedWeight
+            )
+        } ?: emptyList()
+
+        if (session != null) {
+            val templateName = session.template.name
+            val historyItem = HistoryItem(
+                session = WorkoutSession(id = session.sessionId, workoutTemplateId = session.template.id, date = java.time.LocalDate.now(), totalDuration = durationMinutes),
+                templateName = templateName,
+                performedExercises = performed
+            )
+            _recentHistory.value = listOf(historyItem) + _recentHistory.value
+        }
 
         _currentSession.value = null
         _currentExerciseIndex.value = 0
@@ -320,17 +355,26 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
         viewModelScope.launch {
             if (sessionId != null) {
-                val session = db.workoutSessionDao().getWorkoutSessionById(sessionId)
-                if (session != null) {
-                    db.workoutSessionDao().updateWorkoutSession(session.copy(totalDuration = durationMinutes))
+                val dbSession = db.workoutSessionDao().getWorkoutSessionById(sessionId)
+                if (dbSession != null) {
+                    db.workoutSessionDao().updateWorkoutSession(dbSession.copy(totalDuration = durationMinutes))
                 }
-                loadHistory()
             }
+            loadHistory()
             val planId = activePlanId.value
             if (planId != null) {
                 _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
             }
         }
+    }
+
+    fun updateCurrentExercisePlanned(index: Int, sets: Int, reps: Int) {
+        val session = _currentSession.value ?: return
+        if (index < 0 || index >= session.exercises.size) return
+        val updatedExercises = session.exercises.mapIndexed { i, ex ->
+            if (i == index) ex.copy(plannedSets = sets, plannedReps = reps) else ex
+        }
+        _currentSession.value = session.copy(exercises = updatedExercises)
     }
 
     fun selectPlanAsActive(planId: Int?) { viewModelScope.launch { userRepository.setActivePlan(planId) } }

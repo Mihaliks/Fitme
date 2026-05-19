@@ -90,6 +90,22 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
+
+                            if (item.performedExercises.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    item.performedExercises.take(5).forEach { ex ->
+                                        Text(
+                                            text = "${ex.name}: ${ex.actualSets} x ${ex.actualReps} (план: ${ex.plannedSets} x ${ex.plannedReps})",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (item.performedExercises.size > 5) {
+                                        Text("...и ещё ${item.performedExercises.size - 5} упражнений", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
                         }
                         Icon(
                             imageVector = if (isSkipped) Icons.Default.Close else Icons.Default.Check,
