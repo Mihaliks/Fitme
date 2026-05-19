@@ -30,7 +30,7 @@ fun WelcomeScreen(onStartClick: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "пока не придумала",
+            text = "Становись сильнее каждый день",
             fontSize = 16.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )

@@ -20,6 +20,7 @@ import com.example.fitme.data.models.NextWorkoutPreview
 import com.example.fitme.data.repositories.ExerciseRepository
 import com.example.fitme.data.repositories.UserRepository
 import com.example.fitme.data.repositories.WorkoutRepository
+import com.example.fitme.data.seed.DefaultSeedData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -43,15 +44,17 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     private val _plans = workoutRepository.getAllPlans()
 
-    private val seedPlanNames = listOf("Фулбади для новичка", "Верх / низ")
-    private val seedTemplateNames = listOf("Фулбади A", "Фулбади B", "Верх", "Низ")
+    private val seedPlanNames: List<String> = DefaultSeedData.plans.map { it.name.trim() }
+    private val seedTemplateNames: List<String> = DefaultSeedData.workoutTemplates.map { it.name.trim() }
 
     val planBuiltInStatus: StateFlow<Map<Int, Boolean>> = _plans.flatMapLatest { plans ->
         flow {
             val statusMap = plans.associate { plan ->
                 val templates = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(plan.id)
-                val isBuiltIn = templates.any { it.isBuiltIn || it.name in seedTemplateNames } || 
-                               seedPlanNames.any { it.equals(plan.name.trim(), ignoreCase = true) }
+                val isBuiltIn = templates.any { it.isBuiltIn } ||
+                        templates.any { tpl -> seedTemplateNames.any { seedName -> seedName.equals(tpl.name.trim(), ignoreCase = true) } } ||
+                        seedPlanNames.any { seedPlan -> seedPlan.equals(plan.name.trim(), ignoreCase = true) }
+
                 plan.id to isBuiltIn
             }
             emit(statusMap)
