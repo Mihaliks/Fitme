@@ -1,9 +1,12 @@
 package com.example.fitme.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -21,23 +24,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
 import com.example.fitme.data.entities.Plan
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
+import com.example.fitme.data.entities.enums.MuscleGroup
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
 
 
 enum class WorkoutsSubScreen {
@@ -435,6 +435,17 @@ fun BodyRegion.toRussian(): String = when (this) {
     BodyRegion.CARDIO -> "Кардио"; BodyRegion.FULL_BODY -> "Все тело"; BodyRegion.OTHER -> "Другое"
 }
 
+fun MuscleGroup.toRussian(): String = when (this) {
+    MuscleGroup.UPPER_CHEST -> "Верх груди"; MuscleGroup.MIDDLE_CHEST -> "Середина груди"; MuscleGroup.LOWER_CHEST -> "Низ груди"
+    MuscleGroup.LATS -> "Широчайшие"; MuscleGroup.MID_BACK -> "Средняя часть спины"; MuscleGroup.TRAPS -> "Трапеции"; MuscleGroup.LOWER_BACK -> "Поясница"
+    MuscleGroup.FRONT_DELTS -> "Передняя дельта"; MuscleGroup.SIDE_DELTS -> "Средняя дельта"; MuscleGroup.REAR_DELTS -> "Задняя дельта"
+    MuscleGroup.BICEPS -> "Бицепс"; MuscleGroup.BRACHIALIS -> "Брахиалис"; MuscleGroup.TRICEPS -> "Трицепс"; MuscleGroup.FOREARMS -> "Предплечья"
+    MuscleGroup.ABS -> "Пресс"; MuscleGroup.OBLIQUES -> "Косые мышцы"
+    MuscleGroup.GLUTE_MAXIMUS -> "Большая ягодичная"; MuscleGroup.GLUTE_MEDIUS -> "Средняя ягодичная"; MuscleGroup.GLUTE_MINIMUS -> "Малая ягодичная"
+    MuscleGroup.QUADS -> "Квадрицепс"; MuscleGroup.HAMSTRINGS -> "Бицепс бедра"; MuscleGroup.ADDUCTORS -> "Приводящие"
+    MuscleGroup.CALVES -> "Икры"; MuscleGroup.CARDIO -> "Кардио"; MuscleGroup.FULL_BODY -> "Все тело"; MuscleGroup.OTHER -> "Другое"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutConstructorScreen(onBack: () -> Unit, onNavigateToHidden: () -> Unit, onNavigateToHiddenPlans: () -> Unit) {
@@ -702,17 +713,81 @@ fun CompactNumberInput(label: String, value: Int, onValueChange: (Int) -> Unit, 
     OutlinedTextField(value = value.toString(), onValueChange = { it.toIntOrNull()?.let { v -> if (v >= 0) onValueChange(v) } }, label = { Text(label, fontSize = 10.sp) }, modifier = modifier, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), singleLine = true)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExercisePickerDialog(exercises: List<Exercise>, onDismiss: () -> Unit, onSelect: (Exercise) -> Unit) {
     var query by remember { mutableStateOf("") }
+    var selectedRegion by remember { mutableStateOf<BodyRegion?>(null) }
+
+    val filteredExercises = exercises.filter { ex ->
+        (selectedRegion == null || ex.bodyRegion == selectedRegion) &&
+        ex.name.contains(query, true)
+    }
+
     AlertDialog(
-        onDismissRequest = onDismiss, title = { Text("Выберите упражнение") },
+        onDismissRequest = onDismiss,
+        title = { Text("Выберите упражнение") },
         text = {
-            Column(modifier = Modifier.heightIn(max = 400.dp)) {
-                OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Поиск...") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
-                LazyColumn { items(exercises.filter { it.name.contains(query, true) }) { ex -> ListItem(headlineContent = { Text(ex.name) }, supportingContent = { Text(ex.bodyRegion.toRussian()) }, modifier = Modifier.clickable { onSelect(ex) }) } }
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Поиск...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedRegion == null,
+                            onClick = { selectedRegion = null },
+                            label = { Text("Все") }
+                        )
+                    }
+                    items(BodyRegion.entries) { region ->
+                        FilterChip(
+                            selected = selectedRegion == region,
+                            onClick = { selectedRegion = region },
+                            label = { Text(region.toRussian()) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(filteredExercises) { ex ->
+                        ListItem(
+                            headlineContent = { Text(ex.name) },
+                            supportingContent = {
+                                Text(
+                                    text = buildString {
+                                        append(ex.bodyRegion.toRussian())
+                                        ex.muscle?.let {
+                                            append(" • ")
+                                            append(it.toRussian())
+                                        }
+                                    }
+                                )
+                            },
+                            modifier = Modifier.clickable { onSelect(ex) }
+                        )
+                    }
+                }
             }
-        }, confirmButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
     )
 }
 
