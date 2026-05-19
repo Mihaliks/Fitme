@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingSource
 import com.example.fitme.data.AppDatabase
 import com.example.fitme.data.entities.Exercise
 import com.example.fitme.data.entities.ExerciseToDo
@@ -22,8 +23,6 @@ import com.example.fitme.data.repositories.WorkoutRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import androidx.sqlite.db.SimpleSQLiteQuery
-import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 
 data class HistoryItem(
@@ -181,47 +180,53 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun loadHistory() {
         viewModelScope.launch(Dispatchers.IO) {
-            val query = """
-                SELECT ws.id, ws.workout_template_id, ws.date, ws.total_duration, wt.name 
-                FROM workout_sessions ws 
-                LEFT JOIN workout_templates wt ON wt.id = ws.workout_template_id 
-                ORDER BY ws.date DESC, ws.id DESC
-            """.trimIndent()
-
-            val cursor = db.query(SimpleSQLiteQuery(query))
-            val list = mutableListOf<HistoryItem>()
-            val dateCol = cursor.getColumnIndex("date")
-            val nameCol = cursor.getColumnIndex("name")
-            val durCol = cursor.getColumnIndex("total_duration")
-            val idCol = cursor.getColumnIndex("id")
-            val templateIdCol = cursor.getColumnIndex("workout_template_id")
-
-            while (cursor.moveToNext()) {
-                val id = cursor.getInt(idCol)
-                val templateId = if (cursor.isNull(templateIdCol)) null else cursor.getInt(templateIdCol)
-                // SQLite dates are long timestamps sometimes? Let's check converters later! Wait! Room stores LocalDate as String or Long depending on DateConverter.
-                // Let's assume Room uses DateConverter "java.time.LocalDate.toString()" based on usual practices.
-                val dateString = cursor.getString(dateCol)
-                val duration = if (cursor.isNull(durCol)) null else cursor.getInt(durCol)
-                val templateName = if (nameCol >= 0 && !cursor.isNull(nameCol)) cursor.getString(nameCol) else "Неизвестная тренировка"
-
-                try {
-                    val date = if (dateString != null && dateString.contains("-")) {
-                        LocalDate.parse(dateString)
-                    } else if (dateString != null) {
-                        try { LocalDate.ofEpochDay(dateString.toLong()) } catch(e: Exception) { LocalDate.now() }
-                    } else {
-                        LocalDate.now()
-                    }
-                    val session = WorkoutSession(id, templateId, date, duration)
-                    list.add(HistoryItem(session, templateName))
-                } catch(e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            cursor.close()
-            _workoutHistory.value = list
+            _workoutHistory.value = loadHistoryItems()
         }
+    }
+
+    private suspend fun loadHistoryItems(): List<HistoryItem> {
+        val workoutSessionDao = db.workoutSessionDao()
+        val workoutPlanDao = db.workoutPlanDao()
+        val sessions = mutableListOf<WorkoutSession>()
+        val pagingSource: PagingSource<Int, WorkoutSession> = workoutSessionDao.getAllWorkoutSessions()
+        var key: Int? = null
+
+        while (true) {
+            val params: PagingSource.LoadParams<Int> = if (key == null) {
+                PagingSource.LoadParams.Refresh(
+                    key = null,
+                    loadSize = HISTORY_PAGE_SIZE,
+                    placeholdersEnabled = false,
+                )
+            } else {
+                PagingSource.LoadParams.Append(
+                    key = key,
+                    loadSize = HISTORY_PAGE_SIZE,
+                    placeholdersEnabled = false,
+                )
+            }
+
+            when (val result = pagingSource.load(params)) {
+                is PagingSource.LoadResult.Page -> {
+                    sessions += result.data
+                    key = result.nextKey ?: break
+                }
+
+                is PagingSource.LoadResult.Error -> throw result.throwable
+                is PagingSource.LoadResult.Invalid -> break
+            }
+        }
+
+        return sessions.map { session ->
+            val templateName = session.workoutTemplateId
+                ?.let { workoutPlanDao.getWorkoutTemplateById(it)?.name }
+                ?: "Неизвестная тренировка"
+            HistoryItem(session = session, templateName = templateName)
+        }
+    }
+
+    private companion object {
+        const val HISTORY_PAGE_SIZE = 50
     }
 
     fun markWorkoutSkipped(planId: Int) {
