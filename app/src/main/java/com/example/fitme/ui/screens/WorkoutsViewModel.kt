@@ -270,7 +270,10 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun loadHistory() {
         viewModelScope.launch(Dispatchers.IO) {
             val dbItems = loadHistoryItems()
-            _workoutHistory.value = _recentHistory.value + dbItems
+            _workoutHistory.value = (_recentHistory.value + dbItems)
+                .distinctBy { it.session.id }
+                .sortedWith(compareByDescending<HistoryItem> { it.session.date }
+                    .thenByDescending { it.session.id })
         }
     }
 

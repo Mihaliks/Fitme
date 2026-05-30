@@ -58,7 +58,6 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            reverseLayout = true,
             contentPadding = PaddingValues(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
