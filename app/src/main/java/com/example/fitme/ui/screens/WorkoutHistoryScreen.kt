@@ -177,7 +177,6 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                         }
                     }
                 }
-            }
-        }
+            }        }
     }
 }
