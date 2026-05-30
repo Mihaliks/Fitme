@@ -96,7 +96,20 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     item.performedExercises.take(5).forEach { ex ->
                                         Text(
-                                            text = "${ex.name}: ${ex.actualSets} x ${ex.actualReps}",
+                                            text = buildString {
+                                                append(ex.name)
+                                                append(": ")
+                                                if (ex.performedSets.isNotEmpty()) {
+                                                    append(ex.performedSets.joinToString(", ") { set ->
+                                                        val repsText = set.reps?.toString() ?: "—"
+                                                        val weightText = set.weight?.let { "${it} кг" } ?: "—"
+                                                        "${set.setIndex}) $repsText x $weightText"
+                                                    })
+                                                } else {
+                                                    append("${ex.actualSets} x ${ex.actualReps}")
+                                                    ex.actualWeight?.let { append(" • ${it} кг") }
+                                                }
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

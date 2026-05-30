@@ -34,7 +34,15 @@ data class PerformedExercise(
     val plannedReps: Int,
     val actualSets: Int,
     val actualReps: Int,
-    val plannedWeight: Double?
+    val plannedWeight: Double?,
+    val actualWeight: Double? = null,
+    val performedSets: List<PerformedSet> = emptyList()
+)
+
+data class PerformedSet(
+    val setIndex: Int,
+    val reps: Int?,
+    val weight: Double?
 )
 
 data class HistoryItem(
@@ -207,8 +215,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setPeriodizationDisplayEnabled(enabled: Boolean) {
-        _periodizationDisplayEnabled.value = enabled
-        prefs.edit().putBoolean(periodizationDisplayEnabledKey, enabled).apply()
+        prefs.edit { putBoolean(periodizationDisplayEnabledKey, enabled) }
     }
 
     private fun transformSessionForDisabledPeriodization(session: NextWorkoutPlan): NextWorkoutPlan {
@@ -315,13 +322,21 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                          workoutSessionId = session.id,
                          exerciseToDoId = detail.exerciseToDo.id
                      )
-                     PerformedExercise(
+                      PerformedExercise(
                          name = detail.exercise.name,
                          plannedSets = detail.exerciseToDo.sets,
                          plannedReps = detail.exerciseToDo.reps,
                          actualSets = if (notes.isEmpty()) detail.exerciseToDo.sets else notes.size,
                          actualReps = notes.lastOrNull()?.reps ?: detail.exerciseToDo.reps,
-                         plannedWeight = detail.exerciseToDo.weight
+                          plannedWeight = detail.exerciseToDo.weight,
+                          actualWeight = notes.lastOrNull { it.weight != null }?.weight ?: detail.exerciseToDo.weight,
+                          performedSets = notes.map { note ->
+                              PerformedSet(
+                                  setIndex = note.setIndex,
+                                  reps = note.reps,
+                                  weight = note.weight
+                              )
+                          }
                      )
                  }
              } else {
@@ -343,7 +358,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                 val current = _skippedSessionIds.value.toMutableSet()
                 current.add(session.sessionId)
                 _skippedSessionIds.value = current
-                prefs.edit().putStringSet("skipped_sessions", current.map { it.toString() }.toSet()).apply()
+                prefs.edit { putStringSet("skipped_sessions", current.map { it.toString() }.toSet()) }
                 _nextWorkoutPreview.value = workoutRepository.peekNextWorkoutSession(planId)
                 loadHistory()
             }
@@ -469,13 +484,21 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
                       val actualSets = if (notes.isEmpty()) ex.plannedSets else notes.size
                       val actualReps = notes.lastOrNull()?.reps ?: ex.plannedReps
-                      list += PerformedExercise(
+                       list += PerformedExercise(
                           name = ex.exercise.name,
                           plannedSets = ex.plannedSets,
                           plannedReps = ex.plannedReps,
                           actualSets = actualSets,
                           actualReps = actualReps,
-                          plannedWeight = ex.plannedWeight
+                          plannedWeight = ex.plannedWeight,
+                          actualWeight = notes.lastOrNull { it.weight != null }?.weight ?: ex.plannedWeight,
+                          performedSets = notes.map { note ->
+                              PerformedSet(
+                                  setIndex = note.setIndex,
+                                  reps = note.reps,
+                                  weight = note.weight
+                              )
+                          }
                       )
                   }
               }
@@ -563,6 +586,15 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun selectPlanAsActive(planId: Int?) { viewModelScope.launch { userRepository.setActivePlan(planId) } }
 
+    fun activatePlan(plan: Plan) {
+        viewModelScope.launch {
+            if (!plan.isActive) {
+                workoutRepository.restorePlan(plan)
+            }
+            userRepository.setActivePlan(plan.id)
+        }
+    }
+
     fun createNewPlan() {
         _isCreatingNewPlan.value = true
         _editingPlan.value = Plan(id = 0, name = "Новый план", isActive = true)
@@ -625,7 +657,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         return errors
     }
 
-    fun savePlanChanges(): Boolean {
+    fun savePlanChanges(selectAsActive: Boolean = false): Boolean {
         val validationErrors = validatePlan()
         _validationErrors.value = validationErrors
 
@@ -647,6 +679,10 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
             } else {
                 workoutRepository.updatePlan(currentPlan.copy(name = normalizedName))
                 currentPlan.id
+            }
+
+            if (selectAsActive) {
+                userRepository.setActivePlan(persistedPlanId)
             }
 
             val templateIdMap = mutableMapOf<Int, Int>()

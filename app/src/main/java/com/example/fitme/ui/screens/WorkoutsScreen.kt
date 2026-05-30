@@ -232,7 +232,13 @@ fun PlanCard(plan: Plan, isActive: Boolean, onClick: () -> Unit) {
                 else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
             }
             Spacer(modifier = Modifier.height(12.dp))
-            AssistChip(onClick = { }, label = { Text(if (isActive) "Активный план" else "Программа") }, leadingIcon = { Icon(if (isActive) Icons.Default.Star else Icons.AutoMirrored.Filled.Assignment, null, Modifier.size(16.dp)) })
+            if (isActive) {
+                AssistChip(
+                    onClick = { },
+                    label = { Text("Активный план") },
+                    leadingIcon = { Icon(Icons.Default.Star, null, Modifier.size(16.dp)) }
+                )
+            }
         }
     }
 }

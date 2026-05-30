@@ -218,12 +218,26 @@ fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, hiddenTemplates: Li
              )
          }
          item {
-             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                 Button(onClick = { viewModel.startWorkout(plan.id) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.PlayArrow, null); Text("Начать") }
-                 OutlinedButton(onClick = { viewModel.selectPlanAsActive(if (isFollowing) null else plan.id) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp), colors = if (isFollowing) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonColors()) {
-                     Icon(if (isFollowing) Icons.Default.Close else Icons.Default.Check, null); Text(if (isFollowing) "Отписаться" else "Выбрать")
-                 }
-             }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                       Button(onClick = { viewModel.startWorkout(plan.id) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.PlayArrow, null); Text("Начать") }
+                        OutlinedButton(onClick = {
+                            if (plan.id <= 0) {
+                                viewModel.savePlanName(draftPlanName)
+                                if (viewModel.savePlanChanges(selectAsActive = true)) {
+                                    viewModel.closeConstructor()
+                                } else {
+                                    showValidationError = true
+                                }
+                            } else {
+                                    if (isFollowing) viewModel.selectPlanAsActive(null)
+                                    else viewModel.activatePlan(plan)
+                            }
+                        }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp), colors = if (isFollowing) ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonColors()) {
+                            Icon(if (isFollowing) Icons.Default.Close else Icons.Default.Check, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (isFollowing) "Отписаться" else if (plan.id <= 0) "Сохранить и выбрать" else "Выбрать")
+                        }
+                  }
          }
           item {
               Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -248,7 +262,7 @@ fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, hiddenTemplates: Li
              Button(
                  onClick = {
                      viewModel.savePlanName(draftPlanName)
-                     if (viewModel.savePlanChanges()) {
+                      if (viewModel.savePlanChanges(selectAsActive = false)) {
                          viewModel.closeConstructor()
                      } else {
                          showValidationError = true
