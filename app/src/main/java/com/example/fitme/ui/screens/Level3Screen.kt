@@ -107,13 +107,34 @@ fun Level3Screen(onBack: () -> Unit) {
 @Composable
 fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, hiddenTemplates: List<WorkoutTemplate>, exercisesMap: Map<Int, List<ExerciseWithDetails>>, viewModel: WorkoutsViewModel, modifier: Modifier = Modifier) {
     val activePlanId by viewModel.activePlanId.collectAsState()
+    val validationErrors by viewModel.validationErrors.collectAsState()
     val isFollowing = plan.id == activePlanId
     val allPlanTemplates = templates + hiddenTemplates
     val allPlanExercises = allPlanTemplates.flatMap { exercisesMap[it.id].orEmpty() }
     val isPlanPeriodizationEnabled = allPlanExercises.isNotEmpty() && allPlanExercises.all { it.exerciseToDo.periodizationEnabled }
 
+    var draftPlanName by remember(plan.id, plan.name) { mutableStateOf(plan.name) }
+    var showValidationError by remember { mutableStateOf(false) }
     var isReorderMode by remember { mutableStateOf(false) }
     var localTemplates by remember(templates) { mutableStateOf(templates) }
+
+    if (showValidationError && validationErrors.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { showValidationError = false },
+            title = { Text("Ошибка при сохранении плана") },
+            text = {
+                LazyColumn {
+                    items(validationErrors.size) { index ->
+                        Text(validationErrors[index], style = MaterialTheme.typography.bodySmall)
+                        if (index < validationErrors.size - 1) Spacer(Modifier.height(4.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showValidationError = false }) { Text("Ок") }
+            }
+        )
+    }
 
     if (isReorderMode) {
         Column(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -186,7 +207,16 @@ fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, hiddenTemplates: Li
     }
 
      LazyColumn(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 80.dp)) {
-         item { OutlinedTextField(value = plan.name, onValueChange = { viewModel.updatePlanName(it) }, label = { Text("Название плана") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) }
+         item {
+             OutlinedTextField(
+                 value = draftPlanName,
+                 onValueChange = { draftPlanName = it },
+                 label = { Text("Название плана") },
+                 modifier = Modifier.fillMaxWidth(),
+                 shape = RoundedCornerShape(16.dp),
+                 singleLine = true
+             )
+         }
          item {
              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                  Button(onClick = { viewModel.startWorkout(plan.id) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.PlayArrow, null); Text("Начать") }
@@ -214,7 +244,25 @@ fun PlanEditor(plan: Plan, templates: List<WorkoutTemplate>, hiddenTemplates: Li
          items(templates) { template -> TemplateEditorCard(template, exercisesMap[template.id] ?: emptyList(), viewModel) }
          item { Button(onClick = { viewModel.addWorkoutDay() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Icon(Icons.Default.Add, null); Text("Добавить день") } }
          item { Button(onClick = { isReorderMode = true }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Icon(Icons.Default.SwapVert, null); Spacer(Modifier.width(8.dp)); Text("Режим перестановки") } }
-         item { Button(onClick = { viewModel.closeConstructor() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Icon(Icons.Default.Check, null); Text("Завершить") } }
+         item {
+             Button(
+                 onClick = {
+                     viewModel.savePlanName(draftPlanName)
+                     if (viewModel.savePlanChanges()) {
+                         viewModel.closeConstructor()
+                     } else {
+                         showValidationError = true
+                     }
+                 },
+                 modifier = Modifier.fillMaxWidth().height(56.dp),
+                 shape = RoundedCornerShape(16.dp),
+                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+             ) {
+                 Icon(Icons.Default.Check, null)
+                 Spacer(Modifier.width(8.dp))
+                 Text("Сохранить план")
+             }
+         }
      }
  }
 

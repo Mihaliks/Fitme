@@ -114,6 +114,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
      val periodizationDisplayEnabled: StateFlow<Boolean> = _periodizationDisplayEnabled.asStateFlow()
 
      private val _planPeriodizationMode = MutableStateFlow<Map<Int, String>>(loadPlanPeriodizationModes())
+      private var nextDraftTemplateId = -1
+      private var nextDraftExerciseId = -1
 
     val currentSession: StateFlow<NextWorkoutPlan?> = combine(_currentSession, periodizationDisplayEnabled) { session, enabled ->
         if (enabled) session else session?.let { transformSessionForDisabledPeriodization(it) }
@@ -165,6 +167,9 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     private val _showEmptyPlanWarning = MutableStateFlow(false)
     val showEmptyPlanWarning: StateFlow<Boolean> = _showEmptyPlanWarning.asStateFlow()
+
+    private val _validationErrors = MutableStateFlow<List<String>>(emptyList())
+    val validationErrors: StateFlow<List<String>> = _validationErrors.asStateFlow()
 
     private val _hiddenTemplateIds = MutableStateFlow<Set<Int>>(loadHiddenTemplateIds())
 
@@ -559,11 +564,11 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun selectPlanAsActive(planId: Int?) { viewModelScope.launch { userRepository.setActivePlan(planId) } }
 
     fun createNewPlan() {
-        viewModelScope.launch {
-            val planId = workoutRepository.createNewPlan("Новый план")
-            _isCreatingNewPlan.value = true
-            loadPlanForEditing(planId.toInt())
-        }
+        _isCreatingNewPlan.value = true
+        _editingPlan.value = Plan(id = 0, name = "Новый план", isActive = true)
+        _editingTemplates.value = emptyList()
+        _hiddenEditingTemplates.value = emptyList()
+        _editingExercises.value = emptyMap()
     }
 
     fun loadPlanForEditing(planId: Int) {
@@ -586,37 +591,151 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun updatePlanName(name: String) {
+    fun savePlanName(name: String) {
         val current = _editingPlan.value ?: return
-        viewModelScope.launch {
-            val updated = current.copy(name = name)
-            workoutRepository.updatePlan(updated)
-            _editingPlan.value = updated
+        val normalized = name.trim()
+        _editingPlan.value = current.copy(name = normalized)
+    }
+
+    private fun validatePlan(): List<String> {
+        val errors = mutableListOf<String>()
+        val currentPlan = _editingPlan.value
+        val draftTemplates = _editingTemplates.value
+        val draftExercises = _editingExercises.value
+
+        if (currentPlan == null || currentPlan.name.trim().isBlank()) {
+            errors.add("• Название плана не может быть пустым")
         }
+
+        if (draftTemplates.isEmpty()) {
+            errors.add("• План должен содержать хотя бы один день тренировки")
+        } else {
+            draftTemplates.forEachIndexed { index, template ->
+                if (template.name.trim().isBlank()) {
+                    errors.add("• День ${index + 1}: необходимо указать название")
+                }
+
+                val exercises = draftExercises[template.id].orEmpty()
+                if (exercises.isEmpty()) {
+                    errors.add("• День \"${template.name}\": необходимо добавить хотя бы одно упражнение")
+                }
+            }
+        }
+
+        return errors
+    }
+
+    fun savePlanChanges(): Boolean {
+        val validationErrors = validatePlan()
+        _validationErrors.value = validationErrors
+
+        if (validationErrors.isNotEmpty()) {
+            return false
+        }
+
+        val currentPlan = _editingPlan.value ?: return false
+        val normalizedName = currentPlan.name.trim()
+
+        val draftTemplates = _editingTemplates.value
+        val hiddenTemplates = _hiddenEditingTemplates.value
+        val draftExercises = _editingExercises.value
+        val isCreating = _isCreatingNewPlan.value
+
+        viewModelScope.launch {
+            val persistedPlanId = if (isCreating || currentPlan.id <= 0) {
+                workoutRepository.createNewPlan(normalizedName).toInt()
+            } else {
+                workoutRepository.updatePlan(currentPlan.copy(name = normalizedName))
+                currentPlan.id
+            }
+
+            val templateIdMap = mutableMapOf<Int, Int>()
+            draftTemplates.forEach { draftTemplate ->
+                if (draftTemplate.id > 0) {
+                    db.workoutPlanDao().updateWorkoutTemplate(draftTemplate.copy(planId = persistedPlanId))
+                    templateIdMap[draftTemplate.id] = draftTemplate.id
+                } else {
+                    val newId = workoutRepository
+                        .appendWorkoutTemplate(draftTemplate.name, persistedPlanId)
+                        .toInt()
+                    templateIdMap[draftTemplate.id] = newId
+                }
+            }
+
+            val hiddenIds = hiddenTemplates.map { it.id }
+            val orderedVisibleIds = draftTemplates.mapNotNull { templateIdMap[it.id] ?: it.id.takeIf { id -> id > 0 } }
+            val orderedIds = orderedVisibleIds + hiddenIds
+            if (orderedIds.isNotEmpty()) {
+                workoutRepository.reorderWorkoutTemplates(persistedPlanId, orderedIds)
+            }
+
+            draftTemplates.forEach { draftTemplate ->
+                val persistedTemplateId = templateIdMap[draftTemplate.id] ?: draftTemplate.id
+                if (persistedTemplateId <= 0) return@forEach
+
+                val currentExerciseIds = db.exerciseToDoDao()
+                    .getExerciseDetailsForWorkoutOnce(persistedTemplateId)
+                    .map { it.exerciseToDo.id }
+                    .toMutableSet()
+
+                val exerciseDraft = draftExercises[draftTemplate.id].orEmpty()
+                val orderedExerciseIds = mutableListOf<Int>()
+
+                exerciseDraft.forEach { detail ->
+                    val draftExercise = detail.exerciseToDo.copy(workoutTemplateId = persistedTemplateId)
+                    if (draftExercise.id > 0) {
+                        workoutRepository.updateExerciseInWorkoutTemplate(draftExercise)
+                        orderedExerciseIds.add(draftExercise.id)
+                        currentExerciseIds.remove(draftExercise.id)
+                    } else {
+                        val insertedId = workoutRepository.appendExerciseToWorkoutTemplate(
+                            draftExercise.copy(id = 0, order = 0)
+                        ).toInt()
+                        orderedExerciseIds.add(insertedId)
+                    }
+                }
+
+                currentExerciseIds.forEach { staleId ->
+                    val stale = db.exerciseToDoDao().getExerciseToDoById(staleId) ?: return@forEach
+                    workoutRepository.removeExerciseFromWorkoutTemplate(stale)
+                }
+
+                if (orderedExerciseIds.isNotEmpty()) {
+                    workoutRepository.reorderExercisesInWorkoutTemplate(persistedTemplateId, orderedExerciseIds)
+                }
+            }
+
+            _isCreatingNewPlan.value = false
+            _editingPlan.value = db.workoutPlanDao().getPlanById(persistedPlanId)
+            refreshEditingData(persistedPlanId)
+        }
+
+        return true
     }
 
     fun addWorkoutDay() {
-        val planId = _editingPlan.value?.id ?: return
-        viewModelScope.launch {
-            val count = db.workoutPlanDao().getWorkoutTemplatesForPlanOnce(planId).size + 1
-            workoutRepository.appendWorkoutTemplate("День $count", planId)
-            refreshEditingData(planId)
-        }
+        val currentTemplates = _editingTemplates.value
+        val count = currentTemplates.size + _hiddenEditingTemplates.value.size + 1
+        val draftTemplate = WorkoutTemplate(
+            id = nextDraftTemplateId--,
+            planId = _editingPlan.value?.id,
+            name = "День $count",
+            order = currentTemplates.size + 1,
+            isBuiltIn = false,
+        )
+        _editingTemplates.value = currentTemplates + draftTemplate
+        _editingExercises.value = _editingExercises.value + (draftTemplate.id to emptyList())
     }
 
     fun updateTemplateName(template: WorkoutTemplate, newName: String) {
-        viewModelScope.launch {
-            db.workoutPlanDao().updateWorkoutTemplate(template.copy(name = newName))
-            _editingPlan.value?.let { refreshEditingData(it.id) }
+        _editingTemplates.value = _editingTemplates.value.map {
+            if (it.id == template.id) it.copy(name = newName) else it
         }
     }
 
     fun reorderTemplates(orderedIds: List<Int>) {
-        val planId = _editingPlan.value?.id ?: return
-        viewModelScope.launch {
-            workoutRepository.reorderWorkoutTemplates(planId, orderedIds)
-            refreshEditingData(planId)
-        }
+        val byId = _editingTemplates.value.associateBy { it.id }
+        _editingTemplates.value = orderedIds.mapNotNull { byId[it] }
     }
 
     fun hideTemplate(template: WorkoutTemplate) {
@@ -640,30 +759,38 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addExerciseToTemplate(templateId: Int, exercise: Exercise) {
-        viewModelScope.launch {
-            val exerciseToDo = ExerciseToDo(
-                exerciseId = exercise.id,
-                workoutTemplateId = templateId,
-                sets = 3, reps = 12, order = 0,
-                trainingMode = TrainingMode.HYPERTROPHY
-            )
-            workoutRepository.appendExerciseToWorkoutTemplate(exerciseToDo)
-            _editingPlan.value?.let { refreshEditingData(it.id) }
-        }
+        val current = _editingExercises.value
+        val currentList = current[templateId].orEmpty()
+        val exerciseToDo = ExerciseToDo(
+            id = nextDraftExerciseId--,
+            exerciseId = exercise.id,
+            workoutTemplateId = templateId,
+            sets = 3,
+            reps = 12,
+            order = currentList.size + 1,
+            trainingMode = TrainingMode.HYPERTROPHY
+        )
+        _editingExercises.value = current + (templateId to (currentList + ExerciseWithDetails(exerciseToDo, exercise)))
     }
 
     fun updateExerciseDetails(exerciseToDo: ExerciseToDo) {
-        viewModelScope.launch {
-            workoutRepository.updateExerciseInWorkoutTemplate(exerciseToDo)
-            _editingPlan.value?.let { refreshEditingData(it.id) }
+        val templateId = exerciseToDo.workoutTemplateId
+        val current = _editingExercises.value
+        val updated = current[templateId].orEmpty().map { detail ->
+            if (detail.exerciseToDo.id == exerciseToDo.id) detail.copy(exerciseToDo = exerciseToDo) else detail
         }
+        _editingExercises.value = current + (templateId to updated)
     }
 
     fun removeExercise(exerciseToDo: ExerciseToDo) {
-        viewModelScope.launch {
-            workoutRepository.removeExerciseFromWorkoutTemplate(exerciseToDo)
-            _editingPlan.value?.let { refreshEditingData(it.id) }
-        }
+        val templateId = exerciseToDo.workoutTemplateId
+        val current = _editingExercises.value
+        val updated = current[templateId].orEmpty()
+            .filterNot { it.exerciseToDo.id == exerciseToDo.id }
+            .mapIndexed { index, detail ->
+                detail.copy(exerciseToDo = detail.exerciseToDo.copy(order = index + 1))
+            }
+        _editingExercises.value = current + (templateId to updated)
     }
 
     fun dismissEmptyPlanWarning() {
@@ -686,7 +813,7 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun cancelPlanCreation() {
         val plan = _editingPlan.value
-        if (plan != null && _isCreatingNewPlan.value) {
+        if (plan != null && _isCreatingNewPlan.value && plan.id > 0) {
             viewModelScope.launch {
                 db.workoutPlanDao().deletePlan(plan)
                 closeConstructor(force = true)
