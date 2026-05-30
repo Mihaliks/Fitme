@@ -102,13 +102,19 @@ fun AchievementsSection(history: List<HistoryItem>) {
 
         achievements.chunked(2).forEach { rowItems ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max)
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 rowItems.forEach { achievement ->
-                    Box(modifier = Modifier.weight(1f)) {
-                        AchievementCard(achievement)
-                    }
+                    AchievementCard(
+                        achievement = achievement,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
                 }
                 if (rowItems.size == 1) {
                     Spacer(modifier = Modifier.weight(1f))
@@ -119,7 +125,7 @@ fun AchievementsSection(history: List<HistoryItem>) {
 }
 
 @Composable
-fun AchievementCard(achievement: Achievement) {
+fun AchievementCard(achievement: Achievement, modifier: Modifier = Modifier) {
     val containerColor = if (achievement.isUnlocked)
         MaterialTheme.colorScheme.primaryContainer
     else
@@ -133,11 +139,14 @@ fun AchievementCard(achievement: Achievement) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
