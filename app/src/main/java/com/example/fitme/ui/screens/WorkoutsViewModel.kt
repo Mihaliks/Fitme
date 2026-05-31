@@ -41,6 +41,21 @@ data class ExerciseRecordValue(
     val duration: Int? = null
 )
 
+fun formatDurationForUi(durationSeconds: Int): String {
+    if (durationSeconds < 60) return "$durationSeconds сек"
+    val minutes = durationSeconds / 60
+    val seconds = durationSeconds % 60
+    return buildString {
+        append(minutes)
+        append(" мин")
+        if (seconds > 0) {
+            append(" ")
+            append(seconds)
+            append(" сек")
+        }
+    }
+}
+
 data class ExerciseRecordState(
     val lowRep: ExerciseRecordValue? = null,
     val highRep: ExerciseRecordValue? = null
@@ -52,10 +67,20 @@ fun RecordSlot.displayName(): String = when (this) {
 }
 
 fun ExerciseRecordValue.displayText(): String = when {
-    duration != null -> "$duration сек"
+    duration != null && weight != null -> "${weight} кг / ${formatDurationForUi(duration)}"
+    duration != null -> formatDurationForUi(duration)
     weight != null && reps != null -> "${weight} кг × $reps"
     weight != null -> "${weight} кг"
     reps != null -> "$reps повторений"
+    else -> "—"
+}
+
+fun PerformedSet.displayText(): String = when {
+    duration != null && weight != null -> "${weight} кг / ${formatDurationForUi(duration)}"
+    duration != null -> formatDurationForUi(duration)
+    reps != null && weight != null -> "${reps} x ${weight} кг"
+    reps != null -> "$reps повторений"
+    weight != null -> "${weight} кг"
     else -> "—"
 }
 
@@ -75,8 +100,10 @@ data class PerformedExercise(
     val name: String,
     val plannedSets: Int,
     val plannedReps: Int,
+    val plannedDuration: Int? = null,
     val actualSets: Int,
     val actualReps: Int,
+    val actualDuration: Int? = null,
     val plannedWeight: Double?,
     val actualWeight: Double? = null,
     val performedSets: List<PerformedSet> = emptyList()
@@ -85,7 +112,8 @@ data class PerformedExercise(
 data class PerformedSet(
     val setIndex: Int,
     val reps: Int?,
-    val weight: Double?
+    val weight: Double?,
+    val duration: Int? = null
 )
 
 data class HistoryItem(
@@ -412,15 +440,18 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                          name = detail.exercise.name,
                          plannedSets = detail.exerciseToDo.sets,
                          plannedReps = detail.exerciseToDo.reps,
+                          plannedDuration = detail.exerciseToDo.duration,
                          actualSets = if (notes.isEmpty()) detail.exerciseToDo.sets else notes.size,
                          actualReps = notes.lastOrNull()?.reps ?: detail.exerciseToDo.reps,
+                          actualDuration = notes.lastOrNull()?.duration ?: detail.exerciseToDo.duration,
                           plannedWeight = detail.exerciseToDo.weight,
                           actualWeight = notes.lastOrNull { it.weight != null }?.weight ?: detail.exerciseToDo.weight,
                           performedSets = notes.map { note ->
                               PerformedSet(
                                   setIndex = note.setIndex,
                                   reps = note.reps,
-                                  weight = note.weight
+                                   weight = note.weight,
+                                   duration = note.duration
                               )
                           }
                      )
@@ -574,15 +605,18 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                           name = ex.exercise.name,
                           plannedSets = ex.plannedSets,
                           plannedReps = ex.plannedReps,
+                          plannedDuration = ex.exerciseToDo.duration,
                           actualSets = actualSets,
                           actualReps = actualReps,
+                          actualDuration = notes.lastOrNull()?.duration ?: ex.exerciseToDo.duration,
                           plannedWeight = ex.plannedWeight,
                           actualWeight = notes.lastOrNull { it.weight != null }?.weight ?: ex.plannedWeight,
                           performedSets = notes.map { note ->
                               PerformedSet(
                                   setIndex = note.setIndex,
                                   reps = note.reps,
-                                  weight = note.weight
+                                  weight = note.weight,
+                                  duration = note.duration
                               )
                           }
                       )

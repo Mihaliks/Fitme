@@ -100,10 +100,10 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                                                 append(": ")
                                                 if (ex.performedSets.isNotEmpty()) {
                                                     append(ex.performedSets.joinToString(", ") { set ->
-                                                        val repsText = set.reps?.toString() ?: "—"
-                                                        val weightText = set.weight?.let { "${it} кг" } ?: "—"
-                                                        "${set.setIndex}) $repsText x $weightText"
+                                                        "${set.setIndex}) ${set.displayText()}"
                                                     })
+                                                } else if (ex.actualDuration != null) {
+                                                    append("${ex.actualSets} x ${formatDurationForUi(ex.actualDuration)}")
                                                 } else {
                                                     append("${ex.actualSets} x ${ex.actualReps}")
                                                     ex.actualWeight?.let { append(" • ${it} кг") }

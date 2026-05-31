@@ -108,6 +108,8 @@ fun WorkoutSessionScreen(
                 }
             } else exercise.plannedWeight
 
+            val shownWeight = if (isTimeBased) null else displayedWeight
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -215,13 +217,12 @@ fun WorkoutSessionScreen(
                         StatItem(label = "Подходы", value = displayedSets.toString())
 
                         StatItem(
-                            label = if (isTimeBased) "Секунды" else "Повторы",
-                            value = if (isTimeBased) duration.toString() else displayedReps.toString()
+                            label = if (isTimeBased) "Время" else "Повторы",
+                            value = if (isTimeBased) formatDurationForUi(duration) else displayedReps.toString()
                         )
 
-
-                        if (displayedWeight != null) {
-                            StatItem(label = "Вес", value = "${displayedWeight} кг")
+                        if (shownWeight != null) {
+                            StatItem(label = "Вес", value = "${shownWeight} кг")
                         }
                     }
 
@@ -271,40 +272,42 @@ fun WorkoutSessionScreen(
                         OutlinedTextField(
                             value = actualRepsText,
                             onValueChange = { actualRepsText = it },
-                            label = { Text("Повторы") },
-                            modifier = Modifier.weight(1f),
+                            label = { Text(if (isTimeBased) "Секунды" else "Повторы") },
+                            modifier = if (isTimeBased) Modifier.fillMaxWidth() else Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true
                         )
 
-                        OutlinedTextField(
-                            value = actualWeightText,
-                            onValueChange = { actualWeightText = it.replace(',', '.') },
-                            label = { Text("Вес") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true
-                        )
+                        if (!isTimeBased) {
+                            OutlinedTextField(
+                                value = actualWeightText,
+                                onValueChange = { actualWeightText = it.replace(',', '.') },
+                                label = { Text("Вес") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Парсим значения заранее, чтобы можно было отключать кнопку, если данные некорректны
-                    val repsCandidate = actualRepsText.toIntOrNull()
-                    val weightCandidate = actualWeightText.toDoubleOrNull()
                     val durationCandidate = if (isTimeBased) actualRepsText.toIntOrNull() else null
-                    val addEnabled = repsCandidate != null || weightCandidate != null || durationCandidate != null
+                    val repsCandidate = if (isTimeBased) null else actualRepsText.toIntOrNull()
+                    val weightCandidate = if (isTimeBased) null else actualWeightText.toDoubleOrNull()
+                    val addEnabled = if (isTimeBased) durationCandidate != null else repsCandidate != null || weightCandidate != null
 
                     Button(
                         onClick = {
                             val repsValue = repsCandidate
-                            val weightValue = if (isTimeBased) null else weightCandidate
+                            val weightValue = weightCandidate
                             val durationValue = durationCandidate
                             if (repsValue != null || weightValue != null || durationValue != null) {
                                 viewModel.appendNoteForCurrentExercise(
-                                    reps = if (isTimeBased) null else repsValue,
+                                    reps = repsValue,
                                     weight = weightValue,
                                     duration = durationValue
                                 )
@@ -445,14 +448,13 @@ fun WorkoutSessionScreen(
     }
 }
 
-private fun Note.displaySummary(): String = buildString {
-    when {
-        duration != null -> append("${duration} сек")
-        reps != null && weight != null -> append("${reps} повторений • ${weight} кг")
-        reps != null -> append("${reps} повторений")
-        weight != null -> append("${weight} кг")
-        else -> append("—")
-    }
+private fun Note.displaySummary(): String = when {
+    duration != null && weight != null -> "${weight} кг / ${formatDurationForUi(duration)}"
+    duration != null -> formatDurationForUi(duration)
+    reps != null && weight != null -> "${weight} кг × ${reps}"
+    reps != null -> "${reps} повторений"
+    weight != null -> "${weight} кг"
+    else -> "—"
 }
 
 private @Composable
