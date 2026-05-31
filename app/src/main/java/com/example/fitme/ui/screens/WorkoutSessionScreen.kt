@@ -40,11 +40,6 @@ fun WorkoutSessionScreen(
     var actualWeightText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var recordCandidateNote by remember(currentIndex, currentSession) { mutableStateOf<Note?>(null) }
 
-    LaunchedEffect(currentIndex, currentSession) {
-        actualRepsText = ""
-        actualWeightText = ""
-    }
-
     BackHandler {
         viewModel.finishSession()
     }
@@ -130,7 +125,7 @@ fun WorkoutSessionScreen(
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     LinearProgressIndicator(
-                        progress = { progress },
+                        progress = progress,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
@@ -247,16 +242,7 @@ fun WorkoutSessionScreen(
                             )
                         } else {
                             currentNotes.forEachIndexed { index, note ->
-                                val summary = buildString {
-                                    append("Подход ${index + 1}: ")
-                                    when {
-                                        note.duration != null -> append("${note.duration} сек")
-                                        note.reps != null && note.weight != null -> append("${note.reps} повторений • ${note.weight} кг")
-                                        note.reps != null -> append("${note.reps} повторений")
-                                        note.weight != null -> append("${note.weight} кг")
-                                        else -> append("—")
-                                    }
-                                }
+                                val summary = "Подход ${index + 1}: ${note.displaySummary()}"
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -305,19 +291,28 @@ fun WorkoutSessionScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Парсим значения заранее, чтобы можно было отключать кнопку, если данные некорректны
+                    val repsCandidate = actualRepsText.toIntOrNull()
+                    val weightCandidate = actualWeightText.toDoubleOrNull()
+                    val durationCandidate = if (isTimeBased) actualRepsText.toIntOrNull() else null
+                    val addEnabled = repsCandidate != null || weightCandidate != null || durationCandidate != null
+
                     Button(
                         onClick = {
-                            val repsValue = actualRepsText.toIntOrNull()
-                            val weightValue = actualWeightText.toDoubleOrNull()
-                            if (repsValue != null || weightValue != null || isTimeBased) {
+                            val repsValue = repsCandidate
+                            val weightValue = if (isTimeBased) null else weightCandidate
+                            val durationValue = durationCandidate
+                            if (repsValue != null || weightValue != null || durationValue != null) {
                                 viewModel.appendNoteForCurrentExercise(
                                     reps = if (isTimeBased) null else repsValue,
-                                    weight = weightValue
+                                    weight = weightValue,
+                                    duration = durationValue
                                 )
                                 actualRepsText = ""
                                 actualWeightText = ""
                             }
                         },
+                        enabled = addEnabled,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
@@ -377,18 +372,7 @@ fun WorkoutSessionScreen(
         }
     }
 
-    if (recordCandidateNote != null) {
-        val note = recordCandidateNote!!
-        val noteSummary = buildString {
-            when {
-                note.duration != null -> append("${note.duration} сек")
-                note.reps != null && note.weight != null -> append("${note.reps} повторений • ${note.weight} кг")
-                note.reps != null -> append("${note.reps} повторений")
-                note.weight != null -> append("${note.weight} кг")
-                else -> append("—")
-            }
-        }
-
+    recordCandidateNote?.let { note ->
         AlertDialog(
             onDismissRequest = { recordCandidateNote = null },
             title = { Text("Добавить в рекорд") },
@@ -400,7 +384,7 @@ fun WorkoutSessionScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = noteSummary,
+                        text = note.displaySummary(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -461,7 +445,17 @@ fun WorkoutSessionScreen(
     }
 }
 
-@Composable
+private fun Note.displaySummary(): String = buildString {
+    when {
+        duration != null -> append("${duration} сек")
+        reps != null && weight != null -> append("${reps} повторений • ${weight} кг")
+        reps != null -> append("${reps} повторений")
+        weight != null -> append("${weight} кг")
+        else -> append("—")
+    }
+}
+
+private @Composable
 fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -478,7 +472,7 @@ fun StatItem(label: String, value: String) {
     }
 }
 
-@Composable
+private @Composable
 fun DetailInfoCard(
     label: String,
     value: String,
@@ -507,7 +501,4 @@ fun DetailInfoCard(
         }
     }
 }
-
-// ...existing code...
-
 

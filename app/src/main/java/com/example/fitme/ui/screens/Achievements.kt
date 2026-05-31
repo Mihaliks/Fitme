@@ -27,17 +27,6 @@ data class Achievement(
     val icon: ImageVector,
     val isUnlocked: Boolean
 )
-
-/**
- * Упрощённая логика достижений для UI:
- * - Первый workout
- * - 10 тренировок
- * - 50 тренировок
- * - Первый малоповторный рекорд (lowRep)
- * - Первый многоповторный рекорд (highRep)
- *
- * Примечание: лучше перенести вычисления в ViewModel/Domain.
- */
 fun calculateAchievements(
     history: List<HistoryItem>,
     exerciseRecords: Map<Int, ExerciseRecordState>
@@ -91,7 +80,6 @@ fun AchievementsSection(
     history: List<HistoryItem>,
     exerciseRecords: Map<Int, ExerciseRecordState>
 ) {
-    // Мемоизируем вычисление достижений на основе входных данных
     val achievements = remember(history, exerciseRecords) {
         calculateAchievements(history, exerciseRecords)
     }
