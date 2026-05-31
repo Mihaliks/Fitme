@@ -14,6 +14,7 @@ import com.example.fitme.data.entities.User
 import com.example.fitme.data.entities.WorkoutSession
 import com.example.fitme.data.entities.WorkoutTemplate
 import com.example.fitme.data.entities.enums.BodyRegion
+import com.example.fitme.data.entities.enums.MuscleGroup
 import com.example.fitme.data.entities.enums.TrainingMode
 import com.example.fitme.data.entities.relations.ExerciseWithDetails
 import com.example.fitme.data.models.NextWorkoutPlan
@@ -27,6 +28,48 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import org.json.JSONObject
+
+enum class RecordSlot {
+    LOW_REP,
+    HIGH_REP
+}
+
+data class ExerciseRecordValue(
+    val reps: Int? = null,
+    val weight: Double? = null,
+    val duration: Int? = null
+)
+
+data class ExerciseRecordState(
+    val lowRep: ExerciseRecordValue? = null,
+    val highRep: ExerciseRecordValue? = null
+)
+
+fun RecordSlot.displayName(): String = when (this) {
+    RecordSlot.LOW_REP -> "Малоповторный"
+    RecordSlot.HIGH_REP -> "Многоповторный"
+}
+
+fun ExerciseRecordValue.displayText(): String = when {
+    duration != null -> "$duration сек"
+    weight != null && reps != null -> "${weight} кг × $reps"
+    weight != null -> "${weight} кг"
+    reps != null -> "$reps повторений"
+    else -> "—"
+}
+
+private fun ExerciseRecordValue.toJson(): JSONObject = JSONObject().apply {
+    reps?.let { put("reps", it) }
+    weight?.let { put("weight", it) }
+    duration?.let { put("duration", it) }
+}
+
+private fun JSONObject.toRecordValue(): ExerciseRecordValue = ExerciseRecordValue(
+    reps = if (has("reps")) optInt("reps").takeIf { !isNull("reps") } else null,
+    weight = if (has("weight")) optDouble("weight").takeIf { !isNull("weight") } else null,
+    duration = if (has("duration")) optInt("duration").takeIf { !isNull("duration") } else null,
+)
 
 data class PerformedExercise(
     val name: String,
@@ -58,10 +101,18 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     private val userRepository = UserRepository(db.userDao())
     private val exerciseRepository = ExerciseRepository(db.exerciseDao())
     private val prefs = application.getSharedPreferences("workout_ui_prefs", Context.MODE_PRIVATE)
+    private val recordsPrefs = application.getSharedPreferences("exercise_records_ui_prefs", Context.MODE_PRIVATE)
     private val periodizationDisplayEnabledKey = "periodization_display_enabled"
+    private val exerciseRecordsKey = "exercise_records"
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _exerciseSearchQuery = MutableStateFlow("")
+    val exerciseSearchQuery: StateFlow<String> = _exerciseSearchQuery.asStateFlow()
+
+    private val _selectedExerciseMuscleGroup = MutableStateFlow<MuscleGroup?>(null)
+    val selectedExerciseMuscleGroup: StateFlow<MuscleGroup?> = _selectedExerciseMuscleGroup.asStateFlow()
 
     private val _plans = workoutRepository.getAllPlans()
 
@@ -86,6 +137,23 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         val builtIn = plans.filter { status[it.id] == true }
         if (query.isBlank()) builtIn else builtIn.filter { it.name.contains(query, ignoreCase = true) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val filteredExercises: StateFlow<List<Exercise>> = combine(
+        _exerciseSearchQuery,
+        _selectedExerciseMuscleGroup
+    ) { query, muscleGroup -> query.trim() to muscleGroup }
+        .flatMapLatest { (query, muscleGroup) ->
+            val baseFlow = when {
+                query.isBlank() && muscleGroup == null -> exerciseRepository.getAllActiveExercises()
+                query.isBlank() -> exerciseRepository.getAllExercisesByMuscleGroup(muscleGroup!!)
+                muscleGroup == null -> exerciseRepository.searchActiveExercises(query)
+                else -> exerciseRepository.searchActiveExercises(query).map { exercises ->
+                    exercises.filter { it.muscle == muscleGroup }
+                }
+            }
+            baseFlow
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val activePlans: StateFlow<List<Plan>> = combine(_plans, _searchQuery, planBuiltInStatus) { plans, query, status ->
         val activeCustom = plans.filter { it.isActive && status[it.id] == false }
@@ -188,6 +256,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     val workoutHistory: StateFlow<List<HistoryItem>> = _workoutHistory.asStateFlow()
 
     private val _recentHistory = MutableStateFlow<List<HistoryItem>>(emptyList())
+    private val _exerciseRecords = MutableStateFlow(loadExerciseRecords())
+    val exerciseRecords: StateFlow<Map<Int, ExerciseRecordState>> = _exerciseRecords.asStateFlow()
 
     private var workoutStartTime: Long = 0L
     private val noteDao = db.noteDao()
@@ -216,6 +286,19 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun setPeriodizationDisplayEnabled(enabled: Boolean) {
         prefs.edit { putBoolean(periodizationDisplayEnabledKey, enabled) }
+    }
+
+    fun setExerciseSearchQuery(query: String) {
+        _exerciseSearchQuery.value = query
+    }
+
+    fun setSelectedExerciseMuscleGroup(muscleGroup: MuscleGroup?) {
+        _selectedExerciseMuscleGroup.value = muscleGroup
+    }
+
+    fun clearExerciseFilters() {
+        _exerciseSearchQuery.value = ""
+        _selectedExerciseMuscleGroup.value = null
     }
 
     private fun transformSessionForDisabledPeriodization(session: NextWorkoutPlan): NextWorkoutPlan {
@@ -578,6 +661,42 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         return noteDao.getNotesForExerciseInSession(session.sessionId, exercise.exerciseToDo.id)
     }
 
+    fun saveExerciseRecord(
+        exerciseId: Int,
+        slot: RecordSlot,
+        value: ExerciseRecordValue
+    ) {
+        if (value.reps == null && value.weight == null && value.duration == null) return
+
+        val current = _exerciseRecords.value.toMutableMap()
+        val currentState = current[exerciseId] ?: ExerciseRecordState()
+        val updatedState = when (slot) {
+            RecordSlot.LOW_REP -> currentState.copy(lowRep = value)
+            RecordSlot.HIGH_REP -> currentState.copy(highRep = value)
+        }
+        current[exerciseId] = updatedState
+        _exerciseRecords.value = current
+        persistExerciseRecords(current)
+    }
+
+    fun clearExerciseRecord(exerciseId: Int, slot: RecordSlot) {
+        val current = _exerciseRecords.value.toMutableMap()
+        val currentState = current[exerciseId] ?: return
+        val updatedState = when (slot) {
+            RecordSlot.LOW_REP -> currentState.copy(lowRep = null)
+            RecordSlot.HIGH_REP -> currentState.copy(highRep = null)
+        }
+
+        if (updatedState.lowRep == null && updatedState.highRep == null) {
+            current.remove(exerciseId)
+        } else {
+            current[exerciseId] = updatedState
+        }
+
+        _exerciseRecords.value = current
+        persistExerciseRecords(current)
+    }
+
     fun updateCurrentExercisePlanned(index: Int, sets: Int, reps: Int) {
         val session = _currentSession.value ?: return
         if (index < 0 || index >= session.exercises.size) return
@@ -819,6 +938,33 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
             if (detail.exerciseToDo.id == exerciseToDo.id) detail.copy(exerciseToDo = exerciseToDo) else detail
         }
         _editingExercises.value = current + (templateId to updated)
+    }
+
+    private fun loadExerciseRecords(): Map<Int, ExerciseRecordState> {
+        val raw = recordsPrefs.getString(exerciseRecordsKey, null).orEmpty()
+        if (raw.isBlank()) return emptyMap()
+
+        return runCatching {
+            val root = JSONObject(raw)
+            root.keys().asSequence().mapNotNull { key ->
+                val exerciseId = key.toIntOrNull() ?: return@mapNotNull null
+                val entry = root.optJSONObject(key) ?: return@mapNotNull null
+                val low = entry.optJSONObject("lowRep")?.toRecordValue()
+                val high = entry.optJSONObject("highRep")?.toRecordValue()
+                exerciseId to ExerciseRecordState(lowRep = low, highRep = high)
+            }.toMap()
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun persistExerciseRecords(records: Map<Int, ExerciseRecordState>) {
+        val root = JSONObject()
+        records.forEach { (exerciseId, state) ->
+            val entry = JSONObject()
+            state.lowRep?.let { entry.put("lowRep", it.toJson()) }
+            state.highRep?.let { entry.put("highRep", it.toJson()) }
+            root.put(exerciseId.toString(), entry)
+        }
+        recordsPrefs.edit { putString(exerciseRecordsKey, root.toString()) }
     }
 
     fun removeExercise(exerciseToDo: ExerciseToDo) {

@@ -15,6 +15,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.fitme.ui.navigation.Screen
 import com.example.fitme.ui.screens.ProgressScreen
+import com.example.fitme.ui.screens.RecordsScreen
 import com.example.fitme.ui.screens.SettingsScreen
 import com.example.fitme.ui.screens.UserSetupScreen
 import com.example.fitme.ui.screens.WelcomeScreen
@@ -100,9 +101,13 @@ fun MainScreen() {
                     modifier = Modifier.padding(innerPadding)
                 ) {
                     composable(Screen.Progress.route) {
-                        ProgressScreen(onNavigateToHistory = { navController.navigate(Screen.WorkoutHistory.route) })
+                        ProgressScreen(
+                            { navController.navigate(Screen.WorkoutHistory.route) },
+                            { navController.navigate(Screen.Records.route) }
+                        )
                     }
                     composable(Screen.Workouts.route) { WorkoutsScreen() }
+                    composable(Screen.Records.route) { RecordsScreen(onBack = { navController.popBackStack() }) }
                     composable(Screen.Settings.route) { SettingsScreen() }
                     composable(Screen.WorkoutHistory.route) {
                         WorkoutHistoryScreen(onBack = { navController.popBackStack() })

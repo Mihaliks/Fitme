@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.fitme.data.entities.Note
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +38,7 @@ fun WorkoutSessionScreen(
 
     var actualRepsText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var actualWeightText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    var recordCandidateNote by remember(currentIndex, currentSession) { mutableStateOf<Note?>(null) }
 
     LaunchedEffect(currentIndex, currentSession) {
         actualRepsText = ""
@@ -245,13 +247,34 @@ fun WorkoutSessionScreen(
                             )
                         } else {
                             currentNotes.forEachIndexed { index, note ->
-                                val repsText = note.reps?.toString() ?: "—"
-                                val weightText = note.weight?.let { "$it кг" } ?: "—"
-                                Text(
-                                    text = "Подход ${index + 1}: $repsText повторений, $weightText",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                val summary = buildString {
+                                    append("Подход ${index + 1}: ")
+                                    when {
+                                        note.duration != null -> append("${note.duration} сек")
+                                        note.reps != null && note.weight != null -> append("${note.reps} повторений • ${note.weight} кг")
+                                        note.reps != null -> append("${note.reps} повторений")
+                                        note.weight != null -> append("${note.weight} кг")
+                                        else -> append("—")
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = summary,
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    TextButton(
+                                        onClick = { recordCandidateNote = note },
+                                        enabled = note.reps != null || note.weight != null || note.duration != null
+                                    ) {
+                                        Text("В рекорд")
+                                    }
+                                }
                             }
                         }
                     }
@@ -352,6 +375,89 @@ fun WorkoutSessionScreen(
                 }
             }
         }
+    }
+
+    if (recordCandidateNote != null) {
+        val note = recordCandidateNote!!
+        val noteSummary = buildString {
+            when {
+                note.duration != null -> append("${note.duration} сек")
+                note.reps != null && note.weight != null -> append("${note.reps} повторений • ${note.weight} кг")
+                note.reps != null -> append("${note.reps} повторений")
+                note.weight != null -> append("${note.weight} кг")
+                else -> append("—")
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { recordCandidateNote = null },
+            title = { Text("Добавить в рекорд") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = currentSession.exercises.getOrNull(currentIndex)?.exercise?.name.orEmpty(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = noteSummary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Выбери, в какой из двух рекордов сохранить этот подход.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                currentSession.exercises.getOrNull(currentIndex)?.let { exercise ->
+                                    viewModel.saveExerciseRecord(
+                                        exerciseId = exercise.exercise.id,
+                                        slot = RecordSlot.LOW_REP,
+                                        value = ExerciseRecordValue(
+                                            reps = note.reps,
+                                            weight = note.weight,
+                                            duration = note.duration
+                                        )
+                                    )
+                                }
+                                recordCandidateNote = null
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Малоповторный")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                currentSession.exercises.getOrNull(currentIndex)?.let { exercise ->
+                                    viewModel.saveExerciseRecord(
+                                        exerciseId = exercise.exercise.id,
+                                        slot = RecordSlot.HIGH_REP,
+                                        value = ExerciseRecordValue(
+                                            reps = note.reps,
+                                            weight = note.weight,
+                                            duration = note.duration
+                                        )
+                                    )
+                                }
+                                recordCandidateNote = null
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Многоповторный")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { recordCandidateNote = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 }
 
