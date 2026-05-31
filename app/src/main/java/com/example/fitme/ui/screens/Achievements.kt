@@ -5,9 +5,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,7 +19,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import java.time.temporal.ChronoUnit
 
 data class Achievement(
     val id: String,
@@ -25,22 +28,24 @@ data class Achievement(
     val isUnlocked: Boolean
 )
 
-fun calculateAchievements(history: List<HistoryItem>): List<Achievement> {
+/**
+ * Упрощённая логика достижений для UI:
+ * - Первый workout
+ * - 10 тренировок
+ * - 50 тренировок
+ * - Первый малоповторный рекорд (lowRep)
+ * - Первый многоповторный рекорд (highRep)
+ *
+ * Примечание: лучше перенести вычисления в ViewModel/Domain.
+ */
+fun calculateAchievements(
+    history: List<HistoryItem>,
+    exerciseRecords: Map<Int, ExerciseRecordState>
+): List<Achievement> {
     val workoutCount = history.size
-    val maxDuration = history.maxOfOrNull { it.session.totalDuration ?: 0 } ?: 0
-    val sortedDates = history.map { it.session.date }.sortedDescending().distinct()
-    var maxStreak = if (sortedDates.isNotEmpty()) 1 else 0
-    var currentStreak = maxStreak
 
-    for (i in 1 until sortedDates.size) {
-        val daysBetween = ChronoUnit.DAYS.between(sortedDates[i], sortedDates[i - 1])
-        if (daysBetween == 1L) {
-            currentStreak++
-            if (currentStreak > maxStreak) maxStreak = currentStreak
-        } else {
-            currentStreak = 1
-        }
-    }
+    val hasLowRepRecord = exerciseRecords.values.any { it.lowRep != null }
+    val hasHighRepRecord = exerciseRecords.values.any { it.highRep != null }
 
     return listOf(
         Achievement(
@@ -51,46 +56,45 @@ fun calculateAchievements(history: List<HistoryItem>): List<Achievement> {
             isUnlocked = workoutCount >= 1
         ),
         Achievement(
-            id = "five_workouts",
-            title = "Новичок",
-            description = "Завершено 5 тренировок",
-            icon = Icons.Default.Star,
-            isUnlocked = workoutCount >= 5
-        ),
-        Achievement(
             id = "ten_workouts",
             title = "Уверенный старт",
             description = "Завершено 10 тренировок",
-            icon = Icons.Default.FitnessCenter,
+            icon = Icons.Default.Star,
             isUnlocked = workoutCount >= 10
         ),
         Achievement(
             id = "fifty_workouts",
             title = "Железная воля",
-            description = "Завершено 50 тренировок!",
+            description = "Завершено 50 тренировок",
             icon = Icons.Default.EmojiEvents,
             isUnlocked = workoutCount >= 50
         ),
         Achievement(
-            id = "marathon",
-            title = "Марафонец",
-            description = "Тренировка длилась более 120 минут",
-            icon = Icons.Default.Timer,
-            isUnlocked = maxDuration >= 120
+            id = "first_low_rep_record",
+            title = "Первый малоповторный рекорд",
+            description = "Записан первый рекорд в малоповторном слоте",
+            icon = Icons.Default.FitnessCenter,
+            isUnlocked = hasLowRepRecord
         ),
         Achievement(
-            id = "unstoppable",
-            title = "Неудержимый",
-            description = "10 дней тренировок подряд",
-            icon = Icons.Default.Whatshot,
-            isUnlocked = maxStreak >= 10
+            id = "first_high_rep_record",
+            title = "Первый многоповторный рекорд",
+            description = "Записан первый рекорд в многоповторном слоте",
+            icon = Icons.Default.FitnessCenter,
+            isUnlocked = hasHighRepRecord
         )
     )
 }
 
 @Composable
-fun AchievementsSection(history: List<HistoryItem>) {
-    val achievements = calculateAchievements(history)
+fun AchievementsSection(
+    history: List<HistoryItem>,
+    exerciseRecords: Map<Int, ExerciseRecordState>
+) {
+    // Мемоизируем вычисление достижений на основе входных данных
+    val achievements = remember(history, exerciseRecords) {
+        calculateAchievements(history, exerciseRecords)
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -104,7 +108,6 @@ fun AchievementsSection(history: List<HistoryItem>) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Max)
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -113,11 +116,11 @@ fun AchievementsSection(history: List<HistoryItem>) {
                         achievement = achievement,
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
+                            .aspectRatio(1f)
                     )
                 }
                 if (rowItems.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
+                    Box(modifier = Modifier.weight(1f).aspectRatio(1f)) {}
                 }
             }
         }
@@ -139,7 +142,7 @@ fun AchievementCard(achievement: Achievement, modifier: Modifier = Modifier) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier

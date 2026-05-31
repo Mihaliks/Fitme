@@ -21,12 +21,13 @@ import java.time.LocalTime
 
 @Composable
 fun ProgressScreen(onNavigateToHistory: () -> Unit = {}, onNavigateToRecords: () -> Unit = {}) {
-    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
+    val viewModel: WorkoutsViewModel = viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val activePlanId by viewModel.activePlanId.collectAsState()
     val plans by viewModel.activePlans.collectAsState()
     val builtInPlans by viewModel.filteredPlans.collectAsState()
     val currentSession by viewModel.currentSession.collectAsState()
     val history by viewModel.workoutHistory.collectAsState()
+    val exerciseRecords by viewModel.exerciseRecords.collectAsState()
     val user by viewModel.user.collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -197,6 +198,6 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}, onNavigateToRecords: ()
             }
         }
 
-        AchievementsSection(history = history)
+        AchievementsSection(history = history, exerciseRecords = exerciseRecords)
     }
 }
