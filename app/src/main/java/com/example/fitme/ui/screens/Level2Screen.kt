@@ -45,7 +45,13 @@ fun Level2Screen(onBack: () -> Unit) {
                 if (templates.isEmpty()) {
                     item { Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { Text("Тренировок не найдено", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                 } else {
-                    items(templates) { (template, exercises) -> TemplateCard(template, exercises, viewModel) }
+                    items(templates) { (template, exercises) ->
+                        TemplateCard(
+                            template = template,
+                            exercises = exercises,
+                            onStartClick = { viewModel.startWorkoutFromTemplate(template.id) }
+                        )
+                    }
                 }
             }
         }

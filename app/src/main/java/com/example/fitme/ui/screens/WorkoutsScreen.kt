@@ -244,12 +244,16 @@ fun PlanCard(plan: Plan, isActive: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun TemplateCard(template: WorkoutTemplate, exercises: List<ExerciseWithDetails>, viewModel: WorkoutsViewModel) {
+fun TemplateCard(
+    template: WorkoutTemplate,
+    exercises: List<ExerciseWithDetails>,
+    onStartClick: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(template.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                IconButton(onClick = { viewModel.startWorkoutFromTemplate(template.id) }) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = onStartClick) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
             }
             Spacer(Modifier.height(12.dp))
             exercises.forEach { detail ->
@@ -289,7 +293,7 @@ fun TrainingMode.toRussian(): String = when (this) {
 }
 
 @Composable
-fun WorkoutConstructorScreen(onBack: () -> Unit, onNavigateToHidden: () -> Unit, onNavigateToHiddenPlans: () -> Unit) {
+fun WorkoutConstructorScreen(onBack: () -> Unit) {
     Level3Screen(onBack = onBack)
 }
 
