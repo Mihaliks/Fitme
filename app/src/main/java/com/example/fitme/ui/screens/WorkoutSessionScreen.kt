@@ -38,6 +38,9 @@ fun WorkoutSessionScreen(
 
     var actualRepsText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var actualWeightText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    // Для time-based ввода: отдельные поля минут и секунд
+    var minutesText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    var secondsText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var recordCandidateNote by remember(currentIndex, currentSession) { mutableStateOf<Note?>(null) }
 
     BackHandler {
@@ -268,18 +271,40 @@ fun WorkoutSessionScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = actualRepsText,
-                            onValueChange = { actualRepsText = it },
-                            label = { Text(if (isTimeBased) "Секунды" else "Повторы") },
-                            modifier = if (isTimeBased) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
-                        )
+                    if (isTimeBased) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = minutesText,
+                                onValueChange = { minutesText = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Минуты") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
 
-                        if (!isTimeBased) {
+                            OutlinedTextField(
+                                value = secondsText,
+                                onValueChange = { secondsText = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Секунды") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = actualRepsText,
+                                onValueChange = { actualRepsText = it },
+                                label = { Text("Повторы") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+
                             OutlinedTextField(
                                 value = actualWeightText,
                                 onValueChange = { actualWeightText = it.replace(',', '.') },
@@ -295,7 +320,17 @@ fun WorkoutSessionScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Парсим значения заранее, чтобы можно было отключать кнопку, если данные некорректны
-                    val durationCandidate = if (isTimeBased) actualRepsText.toIntOrNull() else null
+                    val minutesCandidate = minutesText.toIntOrNull()
+                    val secondsCandidate = secondsText.toIntOrNull()
+                    val durationCandidate = if (isTimeBased) {
+                        if (minutesText.isBlank() && secondsText.isBlank()) null
+                        else {
+                            val m = minutesCandidate ?: 0
+                            val s = secondsCandidate ?: 0
+                            val total = m * 60 + s
+                            total.takeIf { it > 0 }
+                        }
+                    } else null
                     val repsCandidate = if (isTimeBased) null else actualRepsText.toIntOrNull()
                     val weightCandidate = if (isTimeBased) null else actualWeightText.toDoubleOrNull()
                     val addEnabled = if (isTimeBased) durationCandidate != null else repsCandidate != null || weightCandidate != null
@@ -311,8 +346,13 @@ fun WorkoutSessionScreen(
                                     weight = weightValue,
                                     duration = durationValue
                                 )
-                                actualRepsText = ""
-                                actualWeightText = ""
+                                if (isTimeBased) {
+                                    minutesText = ""
+                                    secondsText = ""
+                                } else {
+                                    actualRepsText = ""
+                                    actualWeightText = ""
+                                }
                             }
                         },
                         enabled = addEnabled,
