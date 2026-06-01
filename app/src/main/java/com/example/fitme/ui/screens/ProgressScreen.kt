@@ -4,6 +4,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -19,13 +20,14 @@ import androidx.compose.foundation.verticalScroll
 import java.time.LocalTime
 
 @Composable
-fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
-    val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
+fun ProgressScreen(onNavigateToHistory: () -> Unit = {}, onNavigateToRecords: () -> Unit = {}) {
+    val viewModel: WorkoutsViewModel = viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val activePlanId by viewModel.activePlanId.collectAsState()
     val plans by viewModel.activePlans.collectAsState()
     val builtInPlans by viewModel.filteredPlans.collectAsState()
     val currentSession by viewModel.currentSession.collectAsState()
     val history by viewModel.workoutHistory.collectAsState()
+    val exerciseRecords by viewModel.exerciseRecords.collectAsState()
     val user by viewModel.user.collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -56,37 +58,52 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column {
+        // Welcome and Progress Header
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = welcomeText,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
+            
+            Text(
+                text = "Ваш Прогресс",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Ваш Прогресс",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onNavigateToHistory) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = "История тренировок",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                OutlinedButton(
+                    onClick = onNavigateToHistory,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.History, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("История", maxLines = 1, softWrap = false)
+                }
+
+                Button(
+                    onClick = onNavigateToRecords,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.EmojiEvents, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Рекорды", maxLines = 1, softWrap = false)
                 }
             }
         }
 
+        // Active Workout Plan Section
         if (activePlan != null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
@@ -181,6 +198,6 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}) {
             }
         }
 
-        AchievementsSection(history = history)
+        AchievementsSection(history = history, exerciseRecords = exerciseRecords)
     }
 }

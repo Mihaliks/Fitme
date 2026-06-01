@@ -1,25 +1,18 @@
 package com.example.fitme.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.fitme.data.entities.Plan
-import com.example.fitme.data.entities.WorkoutTemplate
-import com.example.fitme.data.entities.relations.ExerciseWithDetails
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,14 +20,12 @@ fun Level1Screen(onBack: () -> Unit) {
     val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val plans by viewModel.filteredPlans.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedPlan by viewModel.selectedPlan.collectAsState()
     val templates by viewModel.selectedPlanTemplates.collectAsState()
     val templateExercises by viewModel.templateExercises.collectAsState()
     val activePlanId by viewModel.activePlanId.collectAsState()
-    var selectedPlan by remember { mutableStateOf<Plan?>(null) }
 
-    if (selectedPlan != null) {
-        BackHandler { selectedPlan = null }
-    }
+    BackHandler(enabled = selectedPlan != null) { viewModel.selectPlan(null) }
 
     Scaffold(
         topBar = {
@@ -49,7 +40,7 @@ fun Level1Screen(onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = {
                         if (selectedPlan != null) {
-                            selectedPlan = null
+                            viewModel.selectPlan(null)
                         } else {
                             onBack()
                         }
@@ -84,8 +75,7 @@ fun Level1Screen(onBack: () -> Unit) {
                             plan = plan,
                             isActive = plan.id == activePlanId,
                             onClick = {
-                                selectedPlan = plan
-                                viewModel.loadTemplatesForPlan(plan.id)
+                                viewModel.selectPlan(plan)
                             }
                         )
                     }
@@ -97,13 +87,14 @@ fun Level1Screen(onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        val isFollowing = selectedPlan?.id == activePlanId
+                        val currentPlan = selectedPlan ?: return@item
+                        val isFollowing = currentPlan.id == activePlanId
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
-                                onClick = { viewModel.startWorkout(selectedPlan!!.id) },
+                                onClick = { viewModel.startWorkout(currentPlan.id) },
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(56.dp),
@@ -116,8 +107,11 @@ fun Level1Screen(onBack: () -> Unit) {
 
                             OutlinedButton(
                                 onClick = {
-                                    if (isFollowing) viewModel.selectPlanAsActive(null)
-                                    else viewModel.selectPlanAsActive(selectedPlan?.id)
+                                    if (isFollowing) {
+                                        viewModel.selectPlanAsActive(null)
+                                    } else {
+                                        viewModel.activatePlan(currentPlan)
+                                    }
                                 },
                                 modifier = Modifier
                                     .weight(1.2f)
@@ -134,7 +128,11 @@ fun Level1Screen(onBack: () -> Unit) {
 
                     items(templates) { template ->
                         val exercises = templateExercises[template.id] ?: emptyList()
-                        TemplateCard(template, exercises, viewModel)
+                        TemplateCard(
+                            template = template,
+                            exercises = exercises,
+                            onStartClick = { viewModel.startWorkoutFromTemplate(template.id) }
+                        )
                     }
                 }
             }

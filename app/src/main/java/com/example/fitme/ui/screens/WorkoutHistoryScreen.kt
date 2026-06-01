@@ -58,7 +58,6 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            reverseLayout = true,
             contentPadding = PaddingValues(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -96,7 +95,20 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     item.performedExercises.take(5).forEach { ex ->
                                         Text(
-                                            text = "${ex.name}: ${ex.actualSets} x ${ex.actualReps}",
+                                            text = buildString {
+                                                append(ex.name)
+                                                append(": ")
+                                                if (ex.performedSets.isNotEmpty()) {
+                                                    append(ex.performedSets.joinToString(", ") { set ->
+                                                        "${set.setIndex}) ${set.displayText()}"
+                                                    })
+                                                } else if (ex.actualDuration != null) {
+                                                    append("${ex.actualSets} x ${formatDurationForUi(ex.actualDuration)}")
+                                                } else {
+                                                    append("${ex.actualSets} x ${ex.actualReps}")
+                                                    ex.actualWeight?.let { append(" • ${it} кг") }
+                                                }
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -177,7 +189,6 @@ fun WorkoutHistoryScreen(onBack: () -> Unit = {}) {
                         }
                     }
                 }
-            }
-        }
+            }        }
     }
 }

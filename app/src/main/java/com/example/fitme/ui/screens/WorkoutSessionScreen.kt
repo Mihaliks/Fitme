@@ -16,10 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.fitme.data.entities.Note
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,32 +32,19 @@ fun WorkoutSessionScreen(
     val session by viewModel.currentSession.collectAsState()
     val currentIndex by viewModel.currentExerciseIndex.collectAsState()
     val periodizationDisplayEnabled by viewModel.periodizationDisplayEnabled.collectAsState()
+    val currentNotes by viewModel.observeNotesForCurrentExercise().collectAsState(initial = emptyList())
 
     val currentSession = session ?: return
 
-    var showEditDialog by remember { mutableStateOf(false) }
-    var editedSets by remember { mutableStateOf(currentSession.exercises.getOrNull(currentIndex)?.plannedSets ?: 0) }
-    var editedReps by remember { mutableStateOf(currentSession.exercises.getOrNull(currentIndex)?.plannedReps ?: 0) }
-
-    LaunchedEffect(currentIndex, currentSession) {
-        editedSets = currentSession.exercises.getOrNull(currentIndex)?.plannedSets ?: 0
-        editedReps = currentSession.exercises.getOrNull(currentIndex)?.plannedReps ?: 0
-    }
+    var actualRepsText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    var actualWeightText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    // Для time-based ввода: отдельные поля минут и секунд
+    var minutesText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    var secondsText by remember(currentIndex, currentSession) { mutableStateOf("") }
+    var recordCandidateNote by remember(currentIndex, currentSession) { mutableStateOf<Note?>(null) }
 
     BackHandler {
         viewModel.finishSession()
-    }
-
-    if (showEditDialog) {
-        EditSetsRepsDialog(
-            sets = editedSets,
-            reps = editedReps,
-            onConfirm = { sets, reps ->
-                viewModel.updateCurrentExercisePlanned(currentIndex, sets, reps)
-                showEditDialog = false
-            },
-            onDismiss = { showEditDialog = false }
-        )
     }
 
     val progress = if (currentSession.exercises.isNotEmpty()) {
@@ -121,6 +111,8 @@ fun WorkoutSessionScreen(
                 }
             } else exercise.plannedWeight
 
+            val shownWeight = if (isTimeBased) null else displayedWeight
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -129,18 +121,24 @@ fun WorkoutSessionScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                )
-
                 Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
+                    LinearProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Text(
                         text = exercise.exercise.name,
                         style = MaterialTheme.typography.headlineMedium,
@@ -222,27 +220,149 @@ fun WorkoutSessionScreen(
                         StatItem(label = "Подходы", value = displayedSets.toString())
 
                         StatItem(
-                            label = if (isTimeBased) "Секунды" else "Повторы",
-                            value = if (isTimeBased) duration.toString() else displayedReps.toString()
+                            label = if (isTimeBased) "Время" else "Повторы",
+                            value = if (isTimeBased) formatDurationForUi(duration) else displayedReps.toString()
                         )
 
-
-                        if (displayedWeight != null) {
-                            StatItem(label = "Вес", value = "${displayedWeight} кг")
+                        if (shownWeight != null) {
+                            StatItem(label = "Вес", value = "${shownWeight} кг")
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Фактические подходы",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        if (currentNotes.isEmpty()) {
+                            Text(
+                                text = "Пока нет записанных подходов",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            currentNotes.forEachIndexed { index, note ->
+                                val summary = "Подход ${index + 1}: ${note.displaySummary()}"
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = summary,
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    TextButton(
+                                        onClick = { recordCandidateNote = note },
+                                        enabled = note.reps != null || note.weight != null || note.duration != null
+                                    ) {
+                                        Text("В рекорд")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (isTimeBased) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = minutesText,
+                                onValueChange = { minutesText = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Минуты") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = secondsText,
+                                onValueChange = { secondsText = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Секунды") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = actualRepsText,
+                                onValueChange = { actualRepsText = it },
+                                label = { Text("Повторы") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = actualWeightText,
+                                onValueChange = { actualWeightText = it.replace(',', '.') },
+                                label = { Text("Вес") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Парсим значения заранее, чтобы можно было отключать кнопку, если данные некорректны
+                    val minutesCandidate = minutesText.toIntOrNull()
+                    val secondsCandidate = secondsText.toIntOrNull()
+                    val durationCandidate = if (isTimeBased) {
+                        if (minutesText.isBlank() && secondsText.isBlank()) null
+                        else {
+                            val m = minutesCandidate ?: 0
+                            val s = secondsCandidate ?: 0
+                            val total = m * 60 + s
+                            total.takeIf { it > 0 }
+                        }
+                    } else null
+                    val repsCandidate = if (isTimeBased) null else actualRepsText.toIntOrNull()
+                    val weightCandidate = if (isTimeBased) null else actualWeightText.toDoubleOrNull()
+                    val addEnabled = if (isTimeBased) durationCandidate != null else repsCandidate != null || weightCandidate != null
+
                     Button(
-                        onClick = { showEditDialog = true },
+                        onClick = {
+                            val repsValue = repsCandidate
+                            val weightValue = weightCandidate
+                            val durationValue = durationCandidate
+                            if (repsValue != null || weightValue != null || durationValue != null) {
+                                viewModel.appendNoteForCurrentExercise(
+                                    reps = repsValue,
+                                    weight = weightValue,
+                                    duration = durationValue
+                                )
+                                if (isTimeBased) {
+                                    minutesText = ""
+                                    secondsText = ""
+                                } else {
+                                    actualRepsText = ""
+                                    actualWeightText = ""
+                                }
+                            }
+                        },
+                        enabled = addEnabled,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                     ) {
                         Icon(Icons.Default.Edit, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Редактировать подходы")
+                        Text("Добавить подход")
                     }
                 }
 
@@ -294,9 +414,90 @@ fun WorkoutSessionScreen(
             }
         }
     }
+
+    recordCandidateNote?.let { note ->
+        AlertDialog(
+            onDismissRequest = { recordCandidateNote = null },
+            title = { Text("Добавить в рекорд") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = currentSession.exercises.getOrNull(currentIndex)?.exercise?.name.orEmpty(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = note.displaySummary(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Выбери, в какой из двух рекордов сохранить этот подход.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                currentSession.exercises.getOrNull(currentIndex)?.let { exercise ->
+                                    viewModel.saveExerciseRecord(
+                                        exerciseId = exercise.exercise.id,
+                                        slot = RecordSlot.LOW_REP,
+                                        value = ExerciseRecordValue(
+                                            reps = note.reps,
+                                            weight = note.weight,
+                                            duration = note.duration
+                                        )
+                                    )
+                                }
+                                recordCandidateNote = null
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Малоповторный")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                currentSession.exercises.getOrNull(currentIndex)?.let { exercise ->
+                                    viewModel.saveExerciseRecord(
+                                        exerciseId = exercise.exercise.id,
+                                        slot = RecordSlot.HIGH_REP,
+                                        value = ExerciseRecordValue(
+                                            reps = note.reps,
+                                            weight = note.weight,
+                                            duration = note.duration
+                                        )
+                                    )
+                                }
+                                recordCandidateNote = null
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Многоповторный")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { recordCandidateNote = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 }
 
-@Composable
+private fun Note.displaySummary(): String = when {
+    duration != null && weight != null -> "${weight} кг / ${formatDurationForUi(duration)}"
+    duration != null -> formatDurationForUi(duration)
+    reps != null && weight != null -> "${weight} кг × ${reps}"
+    reps != null -> "${reps} повторений"
+    weight != null -> "${weight} кг"
+    else -> "—"
+}
+
+private @Composable
 fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -313,7 +514,7 @@ fun StatItem(label: String, value: String) {
     }
 }
 
-@Composable
+private @Composable
 fun DetailInfoCard(
     label: String,
     value: String,
@@ -342,65 +543,4 @@ fun DetailInfoCard(
         }
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EditSetsRepsDialog(
-    sets: Int,
-    reps: Int,
-    onConfirm: (Int, Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var localSets by remember { mutableStateOf(sets.toString()) }
-    var localReps by remember { mutableStateOf(reps.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Редактировать подходы и повторения") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = localSets,
-                    onValueChange = { localSets = it },
-                    label = { Text("Количество подходов") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = localReps,
-                    onValueChange = { localReps = it },
-                    label = { Text("Количество повторений") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(localSets.toIntOrNull() ?: sets, localReps.toIntOrNull() ?: reps)
-                    onDismiss()
-                }
-            ) {
-                Text("Сохранить")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Отмена")
-            }
-        }
-    )
-}
-
 
