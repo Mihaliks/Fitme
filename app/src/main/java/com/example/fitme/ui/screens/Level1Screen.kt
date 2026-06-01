@@ -127,16 +127,52 @@ fun Level1Screen(onBack: () -> Unit) {
                     }
 
                     items(templates) { template ->
-                        val exercises = templateExercises[template.id] ?: emptyList()
-                        TemplateCard(
-                            template = template,
-                            exercises = exercises,
-                            onStartClick = { viewModel.startWorkoutFromTemplate(template.id) }
-                        )
-                    }
+                         val exercises = templateExercises[template.id] ?: emptyList()
+                         Level1TemplateCard(
+                             template = template,
+                             exercises = exercises
+                         )
+                     }
                 }
             }
         }
     }
 }
 
+@Composable
+fun Level1TemplateCard(
+    template: com.example.fitme.data.entities.WorkoutTemplate,
+    exercises: List<com.example.fitme.data.entities.relations.ExerciseWithDetails>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                template.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(12.dp))
+            exercises.forEach { detail ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text(detail.exercise.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    val duration = detail.exerciseToDo.duration
+                    Text(
+                        text = if (duration != null && duration > 0) "${detail.exerciseToDo.sets} x $duration сек" else "${detail.exerciseToDo.sets} x ${detail.exerciseToDo.reps}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
