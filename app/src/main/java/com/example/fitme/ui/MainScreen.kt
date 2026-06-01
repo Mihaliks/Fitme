@@ -7,6 +7,16 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
+import com.example.fitme.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -109,7 +119,27 @@ private fun AppTopBar(
     onSettingsClick: () -> Unit
 ) {
     TopAppBar(
-        title = { Text("FitMe") },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+                val logoRes = if (isDarkTheme) {
+                    R.drawable.fitness_winged_logo_white_transparent
+                } else {
+                    R.drawable.fitness_winged_logo_transparent
+                }
+
+                Image(
+                    painter = painterResource(id = logoRes),
+                    contentDescription = "FitMe logo",
+                    modifier = Modifier
+                        .width(36.dp),
+                    contentScale = ContentScale.Fit
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("FitMe")
+            }
+        },
         actions = {
             IconButton(onClick = onSettingsClick) {
                 Icon(
