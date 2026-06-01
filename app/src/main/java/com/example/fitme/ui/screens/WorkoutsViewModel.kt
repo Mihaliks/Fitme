@@ -314,7 +314,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
 
     fun setPeriodizationDisplayEnabled(enabled: Boolean) {
         prefs.edit { putBoolean(periodizationDisplayEnabledKey, enabled) }
-    }
+        _periodizationDisplayEnabled.value = enabled
+     }
 
     fun setExerciseSearchQuery(query: String) {
         _exerciseSearchQuery.value = query
@@ -333,10 +334,17 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         val transformedExercises = session.exercises.map { exercise ->
             val exerciseToDo = exercise.exerciseToDo
             if (!exerciseToDo.periodizationEnabled) {
-                exercise
+                exercise.copy(
+                    plannedSets = exerciseToDo.sets,
+                    plannedReps = exerciseToDo.reps,
+                    plannedWeight = exerciseToDo.weight
+                )
             } else {
                 exercise.copy(
-                    chosenMode = exerciseToDo.trainingMode,
+                    chosenMode = TrainingMode.NONE,
+                    plannedSets = exerciseToDo.sets,
+                    plannedReps = exerciseToDo.reps,
+                    plannedWeight = exerciseToDo.weight
                 )
             }
         }
@@ -450,8 +458,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                               PerformedSet(
                                   setIndex = note.setIndex,
                                   reps = note.reps,
-                                   weight = note.weight,
-                                   duration = note.duration
+                                  weight = note.weight,
+                                  duration = note.duration
                               )
                           }
                      )
@@ -521,73 +529,75 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
     fun selectRegion(region: BodyRegion?) { _selectedRegion.value = region }
 
     fun startWorkout(planId: Int) {
-         viewModelScope.launch {
-             var session = workoutRepository.createNextWorkoutSession(planId)
-             if (session != null) {
-                 session = applyPlanPeriodizationMode(session, planId)
-                 _currentSession.value = session
-                 _currentExerciseIndex.value = 0
-                 workoutStartTime = System.currentTimeMillis()
-             }
-         }
+          viewModelScope.launch {
+              var session = workoutRepository.createNextWorkoutSession(planId)
+              if (session != null) {
+                  // Respect periodization display setting: if enabled, apply plan mode, otherwise force NONE
+                  session = if (periodizationDisplayEnabled.value) applyPlanPeriodizationMode(session, planId) else transformSessionForDisabledPeriodization(session)
+                  _currentSession.value = session
+                  _currentExerciseIndex.value = 0
+                  workoutStartTime = System.currentTimeMillis()
+              }
+          }
+      }
+
+      fun startWorkoutFromTemplate(templateId: Int) {
+          viewModelScope.launch {
+              val session = workoutRepository.createWorkoutSessionFromTemplate(templateId)
+              if (session != null) {
+                  val prepared = if (periodizationDisplayEnabled.value) session else transformSessionForDisabledPeriodization(session)
+                  _currentSession.value = prepared
+                  _currentExerciseIndex.value = 0
+                  workoutStartTime = System.currentTimeMillis()
+              }
+          }
+      }
+
+      private suspend fun applyPlanPeriodizationMode(session: NextWorkoutPlan, planId: Int): NextWorkoutPlan {
+          val mode = getPlanPeriodizationMode(planId)
+          val transformedExercises = session.exercises.map { exercise ->
+              val exerciseToDo = exercise.exerciseToDo
+              if (!exerciseToDo.periodizationEnabled) {
+                  exercise
+              } else {
+                  val newMode = when (mode) {
+                      "A" -> exerciseToDo.modeA ?: exercise.chosenMode
+                      "B" -> exerciseToDo.modeB ?: exercise.chosenMode
+                      else -> exercise.chosenMode
+                  }
+                  val newParams = when (newMode) {
+                      exerciseToDo.modeA -> {
+                          exercise.copy(
+                              chosenMode = newMode,
+                              plannedSets = exerciseToDo.setsA ?: exercise.plannedSets,
+                              plannedReps = exerciseToDo.repsA ?: exercise.plannedReps,
+                              plannedWeight = exerciseToDo.weightA ?: exercise.plannedWeight
+                          )
+                      }
+                      exerciseToDo.modeB -> {
+                          exercise.copy(
+                              chosenMode = newMode,
+                              plannedSets = exerciseToDo.setsB ?: exercise.plannedSets,
+                              plannedReps = exerciseToDo.repsB ?: exercise.plannedReps,
+                              plannedWeight = exerciseToDo.weightB ?: exercise.plannedWeight
+                          )
+                      }
+                      else -> exercise
+                  }
+                  newParams
+              }
+          }
+          return session.copy(exercises = transformedExercises)
+      }
+
+     fun nextExercise() {
+         val session = _currentSession.value ?: return
+         if (_currentExerciseIndex.value < session.exercises.size - 1) _currentExerciseIndex.value++
      }
 
-     fun startWorkoutFromTemplate(templateId: Int) {
-         viewModelScope.launch {
-             val session = workoutRepository.createWorkoutSessionFromTemplate(templateId)
-             if (session != null) {
-                 _currentSession.value = session
-                 _currentExerciseIndex.value = 0
-                 workoutStartTime = System.currentTimeMillis()
-             }
-         }
-     }
+     fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
 
-     private suspend fun applyPlanPeriodizationMode(session: NextWorkoutPlan, planId: Int): NextWorkoutPlan {
-         val mode = getPlanPeriodizationMode(planId)
-         val transformedExercises = session.exercises.map { exercise ->
-             val exerciseToDo = exercise.exerciseToDo
-             if (!exerciseToDo.periodizationEnabled) {
-                 exercise
-             } else {
-                 val newMode = when (mode) {
-                     "A" -> exerciseToDo.modeA ?: exercise.chosenMode
-                     "B" -> exerciseToDo.modeB ?: exercise.chosenMode
-                     else -> exercise.chosenMode
-                 }
-                 val newParams = when (newMode) {
-                     exerciseToDo.modeA -> {
-                         exercise.copy(
-                             chosenMode = newMode,
-                             plannedSets = exerciseToDo.setsA ?: exercise.plannedSets,
-                             plannedReps = exerciseToDo.repsA ?: exercise.plannedReps,
-                             plannedWeight = exerciseToDo.weightA ?: exercise.plannedWeight
-                         )
-                     }
-                     exerciseToDo.modeB -> {
-                         exercise.copy(
-                             chosenMode = newMode,
-                             plannedSets = exerciseToDo.setsB ?: exercise.plannedSets,
-                             plannedReps = exerciseToDo.repsB ?: exercise.plannedReps,
-                             plannedWeight = exerciseToDo.weightB ?: exercise.plannedWeight
-                         )
-                     }
-                     else -> exercise
-                 }
-                 newParams
-             }
-         }
-         return session.copy(exercises = transformedExercises)
-     }
-
-    fun nextExercise() {
-        val session = _currentSession.value ?: return
-        if (_currentExerciseIndex.value < session.exercises.size - 1) _currentExerciseIndex.value++
-    }
-
-    fun previousExercise() { if (_currentExerciseIndex.value > 0) _currentExerciseIndex.value-- }
-
-     fun finishSession() {
+      fun finishSession() {
           val session = _currentSession.value
           val sessionId = session?.sessionId
           val durationMinutes = if (workoutStartTime > 0) ((System.currentTimeMillis() - workoutStartTime) / 60000).toInt() else 0
@@ -619,8 +629,8 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                                   duration = note.duration
                               )
                           }
-                      )
-                  }
+                     )
+                 }
               }
               list
           }
