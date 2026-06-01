@@ -436,7 +436,6 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
                  ?.let { workoutPlanDao.getWorkoutTemplateById(it)?.name }
                  ?: "Неизвестная тренировка"
 
-             // Восстанавливаем информацию о выполненных упражнениях из Notes
              val performedExercises = if (session.workoutTemplateId != null) {
                  val exercises = exerciseToDoDao.getExerciseDetailsForWorkoutOnce(session.workoutTemplateId)
                  exercises.map { detail ->
@@ -532,7 +531,6 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
           viewModelScope.launch {
               var session = workoutRepository.createNextWorkoutSession(planId)
               if (session != null) {
-                  // Respect periodization display setting: if enabled, apply plan mode, otherwise force NONE
                   session = if (periodizationDisplayEnabled.value) applyPlanPeriodizationMode(session, planId) else transformSessionForDisabledPeriodization(session)
                   _currentSession.value = session
                   _currentExerciseIndex.value = 0

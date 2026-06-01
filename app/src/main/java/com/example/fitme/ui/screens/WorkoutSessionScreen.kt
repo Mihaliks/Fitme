@@ -38,7 +38,6 @@ fun WorkoutSessionScreen(
 
     var actualRepsText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var actualWeightText by remember(currentIndex, currentSession) { mutableStateOf("") }
-    // Для time-based ввода: отдельные поля минут и секунд
     var minutesText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var secondsText by remember(currentIndex, currentSession) { mutableStateOf("") }
     var recordCandidateNote by remember(currentIndex, currentSession) { mutableStateOf<Note?>(null) }
@@ -319,7 +318,6 @@ fun WorkoutSessionScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Парсим значения заранее, чтобы можно было отключать кнопку, если данные некорректны
                     val minutesCandidate = minutesText.toIntOrNull()
                     val secondsCandidate = secondsText.toIntOrNull()
                     val durationCandidate = if (isTimeBased) {
