@@ -144,7 +144,7 @@ fun ProgressScreen(onNavigateToHistory: () -> Unit = {}, onNavigateToRecords: ()
                         )
                         nextWorkoutPreview!!.exercises.take(3).forEach { exp ->
                             Text(
-                                text = "- ${exp.exercise.name} ${if(exp.plannedSets > 0) "(${exp.plannedSets}x${exp.plannedReps})" else ""}",
+                                text = "- ${exp.exercise.name}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
