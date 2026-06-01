@@ -9,11 +9,11 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen (val route: String, val title: String, val icon: ImageVector? = null) {
-    object Workouts : Screen("workouts", "Workouts", Icons.Default.FitnessCenter)
-    object Progress : Screen("progress", "Progress", Icons.AutoMirrored.Default.ShowChart)
-    object Records : Screen("records", "Records", Icons.Default.EmojiEvents)
-    object WorkoutHistory : Screen("workoutHistory", "History", Icons.Default.History)
-    object Settings : Screen("settings", "Settings", Icons.Default.Settings)
+    object Workouts : Screen("workouts", "Тренировки", Icons.Default.FitnessCenter)
+    object Progress : Screen("progress", "Прогресс", Icons.AutoMirrored.Default.ShowChart)
+    object Records : Screen("records", "Рекорды", Icons.Default.EmojiEvents)
+    object WorkoutHistory : Screen("workoutHistory", "История", Icons.Default.History)
+    object Settings : Screen("settings", "Настройки", Icons.Default.Settings)
 
     object Welcome : Screen("welcome", "Welcome")
 }
