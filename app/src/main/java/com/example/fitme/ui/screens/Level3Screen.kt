@@ -28,7 +28,7 @@ import com.example.fitme.data.entities.relations.ExerciseWithDetails
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Level3Screen(onBack: () -> Unit) {
+fun Level3Screen(onBack: () -> Unit, onOpenHiddenPlans: () -> Unit = {}) {
     val viewModel: WorkoutsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(androidx.activity.compose.LocalActivity.current as androidx.activity.ComponentActivity)
     val editingPlan by viewModel.editingPlan.collectAsState()
     val editingTemplates by viewModel.editingTemplates.collectAsState()
@@ -70,7 +70,7 @@ fun Level3Screen(onBack: () -> Unit) {
                 },
                 actions = {
                     if (editingPlan == null) {
-                        IconButton(onClick = { /* TODO: navigate to hidden plans */ }) { Icon(Icons.Default.VisibilityOff, null) }
+                        IconButton(onClick = onOpenHiddenPlans) { Icon(Icons.Default.VisibilityOff, null) }
                     } else if (isCreatingNewPlan) {
                         TextButton(onClick = { viewModel.cancelPlanCreation() }) {
                             Text("Отмена", color = MaterialTheme.colorScheme.error)
@@ -293,7 +293,7 @@ fun TemplateEditorCard(template: WorkoutTemplate, exercises: List<ExerciseWithDe
             Row(verticalAlignment = Alignment.CenterVertically) {
                 BasicTextField(value = template.name, onValueChange = { viewModel.updateTemplateName(template, it) }, textStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
                 IconButton(onClick = { viewModel.startWorkoutFromTemplate(template.id) }) { Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary) }
-                IconButton(onClick = { viewModel.hideTemplate(template) }) { Icon(Icons.Default.VisibilityOff, null, tint = MaterialTheme.colorScheme.outline) }
+                IconButton(onClick = { viewModel.removeTemplateFromEditor(template.id) }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
             }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Checkbox(

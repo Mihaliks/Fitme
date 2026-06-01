@@ -940,6 +940,14 @@ class WorkoutsViewModel(application: Application) : AndroidViewModel(application
         _editingTemplates.value = orderedIds.mapNotNull { byId[it] }
     }
 
+    fun removeTemplateFromEditor(templateId: Int) {
+        val currentTemplates = _editingTemplates.value
+        val currentExercises = _editingExercises.value
+
+        _editingTemplates.value = currentTemplates.filterNot { it.id == templateId }
+        _editingExercises.value = currentExercises - templateId
+    }
+
     fun hideTemplate(template: WorkoutTemplate) {
         viewModelScope.launch {
             val currentHidden = _hiddenTemplateIds.value.toMutableSet()

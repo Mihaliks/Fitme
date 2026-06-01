@@ -68,7 +68,10 @@ fun WorkoutsScreen() {
                 WorkoutsSubScreen.MAIN -> WorkoutsMainSelection(onNavigate = { currentSubScreen = it })
                 WorkoutsSubScreen.READY_MADE -> Level1Screen { currentSubScreen = WorkoutsSubScreen.MAIN }
                 WorkoutsSubScreen.BY_MUSCLE -> Level2Screen { currentSubScreen = WorkoutsSubScreen.MAIN }
-                WorkoutsSubScreen.CONSTRUCTOR -> Level3Screen { currentSubScreen = WorkoutsSubScreen.MAIN }
+                WorkoutsSubScreen.CONSTRUCTOR -> Level3Screen(
+                    onBack = { currentSubScreen = WorkoutsSubScreen.MAIN },
+                    onOpenHiddenPlans = { currentSubScreen = WorkoutsSubScreen.HIDDEN_PLANS }
+                )
                 WorkoutsSubScreen.HIDDEN_TEMPLATES -> HiddenTemplatesScreen {
                     currentSubScreen = WorkoutsSubScreen.CONSTRUCTOR
                 }
